@@ -1,36 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ⚡ OpenClaw Mission Control
 
-## Getting Started
+A Mission Control dashboard for [OpenClaw](https://openclaw.ai) agent fleets. Inspired by [@AlexFinn's article](https://x.com/AlexFinn/status/2024169334344679783).
 
-First, run the development server:
+> Built in an afternoon by delegating to the agent fleet itself.
+
+## Panels
+
+| Panel | Description |
+|-------|-------------|
+| 🗂️ **Tasks Board** | Kanban board (Backlog / In Progress / Done) shared between you and your agents |
+| 📅 **Calendar** | Monthly view of OpenClaw cron jobs + manual events |
+| 🧠 **Memory** | Browse and search all agent memory files with markdown preview |
+| 👥 **Team** | Live agent roster pulled from your OpenClaw config — names, models, workspaces |
+| 🎬 **Content Pipeline** | 5-stage kanban for content creation (Idea → Scripted → Thumbnail → Filming → Published) |
+| 🏢 **Office** | Agent workstations with live status and current task |
+
+## Stack
+
+- **NextJS 14** (App Router)
+- **Tailwind CSS** (dark theme)
+- **SQLite** via `better-sqlite3` — no SaaS, no Convex account needed
+- **Lucide React** icons
+
+## Setup
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/stephenschoettler/openclaw-mission-control
+cd openclaw-mission-control
+npm install
+npm run build
+npm start -- -p 3001
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Runs at `http://localhost:3001`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## OpenClaw Integration
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The dashboard reads directly from your OpenClaw config:
 
-## Learn More
+- **Agents** → `~/.openclaw/openclaw.json` (`agents.list`)
+- **Crons** → `~/.openclaw/openclaw.json` (`crons`)
+- **Memory files** → `~/.openclaw/workspace/memory/*.md`
 
-To learn more about Next.js, take a look at the following resources:
+Persistent data (tasks, events, content, office status) is stored at `~/.mission-control/db.sqlite`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Systemd Service (optional)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+systemctl --user enable --now mission-control
+```
 
-## Deploy on Vercel
+Service file is at `~/.config/systemd/user/mission-control.service` after first run.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Inspired By
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+[@AlexFinn](https://x.com/AlexFinn) — [Your OpenClaw is useless without a Mission Control](https://x.com/AlexFinn/status/2024169334344679783)
