@@ -13,11 +13,13 @@ interface CalEvent {
 
 interface CronJob {
   id: string;
-  schedule: string;
+  schedule: string | { kind: string; expr: string; tz?: string };
   name?: string;
   label?: string;
+  agentId?: string;
   agent?: string;
   enabled?: boolean;
+  payload?: { message?: string };
 }
 
 function parseCronNextDate(schedule: string, year: number, month: number): number[] {
@@ -118,7 +120,8 @@ export default function CalendarPage() {
   const cronDays: Record<number, CronJob[]> = {};
   for (const cron of crons) {
     if (cron.enabled === false) continue;
-    const days = parseCronNextDate(cron.schedule, year, month);
+    const scheduleExpr = typeof cron.schedule === 'string' ? cron.schedule : cron.schedule?.expr ?? '';
+    const days = parseCronNextDate(scheduleExpr, year, month);
     for (const d of days) {
       if (!cronDays[d]) cronDays[d] = [];
       cronDays[d].push(cron);
