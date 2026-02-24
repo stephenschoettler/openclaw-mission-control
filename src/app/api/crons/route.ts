@@ -2,16 +2,16 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 
-const OPENCLAW_CONFIG = path.join(process.env.HOME || '/home/w0lf', '.openclaw', 'openclaw.json');
+const CRONS_FILE = path.join(process.env.HOME || '/home/w0lf', '.openclaw', 'cron', 'jobs.json');
 
 export async function GET() {
   try {
-    if (!fs.existsSync(OPENCLAW_CONFIG)) {
+    if (!fs.existsSync(CRONS_FILE)) {
       return NextResponse.json([]);
     }
-    const data = JSON.parse(fs.readFileSync(OPENCLAW_CONFIG, 'utf-8'));
-    const crons = data.crons || [];
-    return NextResponse.json(crons);
+    const data = JSON.parse(fs.readFileSync(CRONS_FILE, 'utf-8'));
+    const jobs = data.jobs || [];
+    return NextResponse.json(jobs);
   } catch {
     return NextResponse.json([]);
   }
