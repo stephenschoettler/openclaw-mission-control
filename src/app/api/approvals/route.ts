@@ -28,10 +28,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing required fields: title, type, agent, content' }, { status: 400 });
   }
 
-  const stmt = db.prepare(
-    'INSERT INTO approvals (title, type, agent, content, notes) VALUES (?, ?, ?, ?, ?)'
-  );
-  const result = stmt.run(title, type, agent, content, notes ?? null);
-  const row = db.prepare('SELECT * FROM approvals WHERE id = ?').get(result.lastInsertRowid);
-  return NextResponse.json(row, { status: 201 });
+  try {
+    const stmt = db.prepare(
+      'INSERT INTO approvals (title, type, agent, content, notes) VALUES (?, ?, ?, ?, ?)'
+    );
+    const result = stmt.run(title, type, agent, content, notes ?? null);
+    const row = db.prepare('SELECT * FROM approvals WHERE id = ?').get(result.lastInsertRowid);
+    return NextResponse.json(row, { status: 201 });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Database error';
+    if (message.includes('CHECK constraint')) {
+      return NextResponse.json({ error: 'Invalid type. Must be one of: outreach, proposal, code, strategy, other' }, { status: 400 });
+    }
+    return NextResponse.json({ error: 'Failed to create approval' }, { status: 500 });
+  }
 }

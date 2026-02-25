@@ -38,23 +38,36 @@ function ApprovalCard({
   onReject,
 }: {
   approval: Approval;
-  onApprove: (id: number, notes: string) => void;
-  onReject: (id: number, notes: string) => void;
+  onApprove: (id: number, notes: string) => Promise<void>;
+  onReject: (id: number, notes: string) => Promise<void>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [notes, setNotes] = useState('');
   const [acting, setActing] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const handleApprove = async () => {
     setActing(true);
-    await onApprove(approval.id, notes);
-    setActing(false);
+    setActionError(null);
+    try {
+      await onApprove(approval.id, notes);
+    } catch {
+      setActionError('Failed to approve — please try again.');
+    } finally {
+      setActing(false);
+    }
   };
 
   const handleReject = async () => {
     setActing(true);
-    await onReject(approval.id, notes);
-    setActing(false);
+    setActionError(null);
+    try {
+      await onReject(approval.id, notes);
+    } catch {
+      setActionError('Failed to reject — please try again.');
+    } finally {
+      setActing(false);
+    }
   };
 
   const preview = approval.content.length > 200 ? approval.content.slice(0, 200) + '…' : approval.content;
@@ -118,6 +131,14 @@ function ApprovalCard({
           Reject
         </button>
       </div>
+
+      {/* Error feedback */}
+      {actionError && (
+        <p className="text-[11px] text-red-400 mt-2 flex items-center gap-1">
+          <XCircle size={11} />
+          {actionError}
+        </p>
+      )}
     </div>
   );
 }
@@ -178,11 +199,14 @@ export default function ApprovalsPage() {
   const history = approvals.filter(a => a.status !== 'pending');
 
   const handleAction = async (id: number, status: 'approved' | 'rejected', notes: string) => {
-    await fetch(`/api/approvals/${id}`, {
+    const res = await fetch(`/api/approvals/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status, notes: notes || null }),
     });
+    if (!res.ok) {
+      throw new Error(`Server returned ${res.status}`);
+    }
     fetchApprovals();
   };
 
