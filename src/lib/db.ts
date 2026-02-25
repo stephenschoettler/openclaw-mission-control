@@ -66,6 +66,16 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS activity_feed (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_id TEXT NOT NULL,
+    agent_name TEXT NOT NULL,
+    event_type TEXT NOT NULL CHECK(event_type IN ('task_start','task_end','spawn','message','approval','status_change','system')),
+    title TEXT NOT NULL,
+    detail TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 export default db;

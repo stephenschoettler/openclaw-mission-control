@@ -2,258 +2,378 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { CheckSquare, CalendarDays, Brain, Users, Film, Building2, Zap, TrendingUp, Clock, Activity } from 'lucide-react';
-
-interface Task {
-  id: number;
-  title: string;
-  status: string;
-  priority: string;
-  assignee: string;
-  created_at: string;
-}
-
-interface Agent {
-  id: string;
-  name: string;
-  model?: string;
-}
-
-interface CronJob {
-  id: string;
-  name?: string;
-  label?: string;
-  schedule: string | { kind: string; expr: string };
-  enabled?: boolean;
-}
+import { CheckSquare, CalendarDays, Inbox, Activity, Clock, Users, TrendingUp, AlertCircle } from 'lucide-react';
 
 interface OfficeStation {
   agent_id: string;
   agent_name: string;
   status: string;
   current_task: string;
+  updated_at: string;
 }
 
-export default function OverviewPage() {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [agents, setAgents] = useState<Agent[]>([]);
-  const [crons, setCrons] = useState<CronJob[]>([]);
+interface ApprovalItem {
+  id: number;
+  title: string;
+  agent: string;
+  type: string;
+  status: string;
+}
+
+interface ActivityEntry {
+  id: number;
+  agent_id: string;
+  agent_name: string;
+  event_type: string;
+  title: string;
+  detail: string | null;
+  created_at: string;
+}
+
+interface CalendarEvent {
+  id: number;
+  title: string;
+  date: string;
+  time: string;
+}
+
+interface Task {
+  id: number;
+  status: string;
+}
+
+const EVENT_COLORS: Record<string, string> = {
+  task_start:    'text-indigo-400 bg-indigo-500/15',
+  task_end:      'text-green-400 bg-green-500/15',
+  spawn:         'text-purple-400 bg-purple-500/15',
+  message:       'text-blue-400 bg-blue-500/15',
+  approval:      'text-amber-400 bg-amber-500/15',
+  status_change: 'text-cyan-400 bg-cyan-500/15',
+  system:        'text-neutral-400 bg-neutral-500/10',
+};
+
+const AGENT_EMOJIS: Record<string, string> = {
+  'babbage': '🧠', 'code-monkey': '🐒', 'code-frontend': '🎨',
+  'code-backend': '⚙️', 'code-devops': '🛠️', 'ralph': '🔍', 'system': '🖥️',
+};
+
+function getAgentEmoji(agentId: string): string {
+  const lower = agentId.toLowerCase();
+  for (const [key, emoji] of Object.entries(AGENT_EMOJIS)) {
+    if (lower.includes(key)) return emoji;
+  }
+  return '🤖';
+}
+
+function relativeTime(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+function formatEventDate(date: string, time: string): string {
+  const d = new Date(`${date}T${time || '00:00'}`);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' }) +
+    (time ? ` · ${time}` : '');
+}
+
+export default function CommandCenterPage() {
   const [stations, setStations] = useState<OfficeStation[]>([]);
-  const [memCount, setMemCount] = useState(0);
+  const [approvals, setApprovals] = useState<ApprovalItem[]>([]);
+  const [activity, setActivity] = useState<ActivityEntry[]>([]);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [hasEvents, setHasEvents] = useState(false);
 
   const fetchAll = useCallback(async () => {
-    const [tRes, aRes, cRes, oRes, mRes] = await Promise.all([
-      fetch('/api/tasks'), fetch('/api/agents'), fetch('/api/crons'),
-      fetch('/api/office'), fetch('/api/memory'),
+    const [oRes, aRes, actRes, eRes, tRes] = await Promise.all([
+      fetch('/api/office'),
+      fetch('/api/approvals?status=pending'),
+      fetch('/api/activity'),
+      fetch('/api/events').catch(() => null),
+      fetch('/api/tasks'),
     ]);
-    setTasks(await tRes.json());
-    setAgents(await aRes.json());
-    setCrons(await cRes.json());
+
     setStations(await oRes.json());
-    const memFiles = await mRes.json();
-    setMemCount(Array.isArray(memFiles) ? memFiles.length : 0);
+    setApprovals(await aRes.json());
+    setActivity((await actRes.json()).slice(0, 5));
+    setTasks(await tRes.json());
+
+    if (eRes) {
+      try {
+        const evData: CalendarEvent[] = await eRes.json();
+        const upcoming = evData
+          .filter(e => new Date(`${e.date}T${e.time || '00:00'}`) >= new Date())
+          .sort((a, b) => new Date(`${a.date}T${a.time || '00:00'}`).getTime() - new Date(`${b.date}T${b.time || '00:00'}`).getTime())
+          .slice(0, 2);
+        setEvents(upcoming);
+        setHasEvents(upcoming.length > 0);
+      } catch {
+        setHasEvents(false);
+      }
+    }
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
-  useEffect(() => { const id = setInterval(fetchAll, 30000); return () => clearInterval(id); }, [fetchAll]);
+  useEffect(() => {
+    const id = setInterval(fetchAll, 15000);
+    return () => clearInterval(id);
+  }, [fetchAll]);
 
-  const tasksByStatus = {
-    backlog: tasks.filter(t => t.status === 'backlog').length,
-    in_progress: tasks.filter(t => t.status === 'in_progress').length,
+  const workingAgents = stations.filter(s => s.status === 'working');
+  const taskCounts = {
+    todo: tasks.filter(t => t.status === 'backlog').length,
+    inProgress: tasks.filter(t => t.status === 'in_progress').length,
     done: tasks.filter(t => t.status === 'done').length,
   };
-  const completion = tasks.length > 0 ? Math.round((tasksByStatus.done / tasks.length) * 100) : 0;
-  const workingAgents = stations.filter(s => s.status === 'working').length;
-  const activeCrons = crons.filter(c => c.enabled !== false).length;
-
-  const recentTasks = [...tasks].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 5);
+  const totalTasks = tasks.length;
+  const donePercent = totalTasks > 0 ? Math.round((taskCounts.done / totalTasks) * 100) : 0;
 
   return (
     <div className="max-w-6xl mx-auto">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-extrabold gradient-text tracking-tight">Command Center</h1>
-        <p className="text-sm text-neutral-500 mt-1">Fleet overview and system status</p>
+        <p className="text-sm text-neutral-500 mt-1">Live fleet status — refreshes every 15s</p>
       </div>
 
-      {/* Top Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="card p-4 relative overflow-hidden shimmer-hover">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-indigo-500/15 flex items-center justify-center">
-              <Users size={16} className="text-indigo-400" />
-            </div>
-            <span className="text-xs text-neutral-500 font-medium">Fleet Size</span>
-          </div>
-          <p className="text-2xl font-bold text-white">{agents.length}</p>
-          <p className="text-[11px] text-neutral-500 mt-0.5">{workingAgents} working now</p>
+      {/* Active Agents — prominent at top */}
+      <section className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-neutral-300 flex items-center gap-2">
+            <Users size={14} className="text-green-400" />
+            Active Agents
+            {workingAgents.length > 0 && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/25">
+                {workingAgents.length} working
+              </span>
+            )}
+          </h2>
+          <Link href="/office" className="text-[11px] text-neutral-500 hover:text-indigo-400 transition-colors">View Office →</Link>
         </div>
 
-        <div className="card p-4 relative overflow-hidden shimmer-hover">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-green-500/15 flex items-center justify-center">
-              <TrendingUp size={16} className="text-green-400" />
-            </div>
-            <span className="text-xs text-neutral-500 font-medium">Completion</span>
+        {workingAgents.length === 0 ? (
+          <div className="card p-4 text-center">
+            <p className="text-xs text-neutral-600">No agents currently working</p>
           </div>
-          <p className="text-2xl font-bold text-white">{completion}%</p>
-          <div className="mt-1.5 h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full transition-all duration-500" style={{ width: `${completion}%` }} />
-          </div>
-        </div>
-
-        <div className="card p-4 relative overflow-hidden shimmer-hover">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-purple-500/15 flex items-center justify-center">
-              <CheckSquare size={16} className="text-purple-400" />
-            </div>
-            <span className="text-xs text-neutral-500 font-medium">Total Tasks</span>
-          </div>
-          <p className="text-2xl font-bold text-white">{tasks.length}</p>
-          <p className="text-[11px] text-neutral-500 mt-0.5">{tasksByStatus.in_progress} in progress</p>
-        </div>
-
-        <div className="card p-4 relative overflow-hidden shimmer-hover">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-orange-500/15 flex items-center justify-center">
-              <Zap size={16} className="text-orange-400" />
-            </div>
-            <span className="text-xs text-neutral-500 font-medium">Automations</span>
-          </div>
-          <p className="text-2xl font-bold text-white">{activeCrons}</p>
-          <p className="text-[11px] text-neutral-500 mt-0.5">cron jobs active</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        {/* Fleet Status */}
-        <div className="col-span-2 card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-              <Activity size={14} className="text-indigo-400" />
-              Fleet Status
-            </h3>
-            <Link href="/office" className="text-[11px] text-neutral-500 hover:text-indigo-400 transition-colors">View Office →</Link>
-          </div>
-          {stations.length === 0 ? (
-            <p className="text-xs text-neutral-600 py-4 text-center">No agents online</p>
-          ) : (
-            <div className="space-y-2.5">
-              {[...stations].sort((a,b) => a.status==='working'?-1:b.status==='working'?1:0).slice(0,6).map(s => (
-                <div key={s.agent_id} className="flex items-center gap-3 p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.04]">
-                  <div className="relative">
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs">
-                      {s.agent_name?.split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {workingAgents.map(agent => (
+              <div key={agent.agent_id} className="card p-4 border-green-500/20 shimmer-hover relative overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-green-500/0 via-green-500/60 to-green-500/0" />
+                <div className="flex items-start gap-3">
+                  <div className="relative shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white font-bold text-sm">
+                      {agent.agent_name.split(/\s+/).map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)}
                     </div>
-                    <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#0a0a0f] ${
-                      s.status === 'working' ? 'bg-green-400 pulse-dot' : s.status === 'idle' ? 'bg-yellow-400' : 'bg-neutral-600'
-                    }`} />
+                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#0a0a0f] bg-green-400 pulse-dot" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-white">{s.agent_name}</p>
-                    <p className="text-[10px] text-neutral-500 truncate">{s.current_task || 'No active task'}</p>
+                    <p className="text-sm font-semibold text-white">{agent.agent_name}</p>
+                    <p className="text-[11px] text-neutral-500 truncate mt-0.5">{agent.current_task || 'Working...'}</p>
+                    <p className="text-[10px] text-neutral-700 mt-1">Updated {relativeTime(agent.updated_at)}</p>
                   </div>
-                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                    s.status === 'working' ? 'text-green-400 bg-green-500/10' : s.status === 'idle' ? 'text-yellow-400 bg-yellow-500/10' : 'text-neutral-500 bg-white/[0.04]'
-                  }`}>
-                    {s.status}
-                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Idle agents summary */}
+        {stations.filter(s => s.status !== 'working').length > 0 && (
+          <div className="mt-2 flex items-center gap-2">
+            <p className="text-[11px] text-neutral-600">
+              Also online: {stations.filter(s => s.status !== 'working').map(s => s.agent_name).join(', ')}
+            </p>
+          </div>
+        )}
+      </section>
+
+      {/* Middle row: Approvals + Activity + Events */}
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        {/* Pending Approvals */}
+        <div className="card p-5 shimmer-hover">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+              <Inbox size={14} className="text-amber-400" />
+              Pending Approvals
+            </h3>
+            <Link href="/approvals" className="text-[11px] text-neutral-500 hover:text-amber-400 transition-colors">View →</Link>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className={`text-4xl font-extrabold ${approvals.length > 0 ? 'text-amber-400' : 'text-neutral-600'}`}>
+              {approvals.length}
+            </div>
+            {approvals.length > 0 && (
+              <div className="flex items-center gap-1.5">
+                <AlertCircle size={16} className="text-amber-400" />
+                <span className="text-xs text-amber-400 font-medium">Needs review</span>
+              </div>
+            )}
+          </div>
+          {approvals.length > 0 && (
+            <div className="mt-3 space-y-1.5">
+              {approvals.slice(0, 3).map(a => (
+                <div key={a.id} className="text-[11px] text-neutral-400 flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                  <span className="truncate">{a.title}</span>
                 </div>
               ))}
-              {stations.length > 6 && <p className="text-[10px] text-neutral-600 text-center mt-2">+{stations.length - 6} more · <a href="/office" className="hover:text-neutral-400 transition-colors">view all</a></p>}
+              {approvals.length > 3 && (
+                <p className="text-[10px] text-neutral-600">+{approvals.length - 3} more</p>
+              )}
             </div>
           )}
         </div>
 
-        {/* Quick Stats */}
+        {/* Recent Activity */}
         <div className="card p-5">
-          <h3 className="text-sm font-semibold text-white flex items-center gap-2 mb-4">
-            <Clock size={14} className="text-purple-400" />
-            Task Breakdown
-          </h3>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full bg-neutral-500" />
-                <span className="text-xs text-neutral-400">Backlog</span>
-              </div>
-              <span className="text-sm font-semibold text-white">{tasksByStatus.backlog}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
-                <span className="text-xs text-neutral-400">In Progress</span>
-              </div>
-              <span className="text-sm font-semibold text-white">{tasksByStatus.in_progress}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
-                <span className="text-xs text-neutral-400">Done</span>
-              </div>
-              <span className="text-sm font-semibold text-white">{tasksByStatus.done}</span>
-            </div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+              <Activity size={14} className="text-indigo-400" />
+              Recent Activity
+            </h3>
+            <Link href="/activity" className="text-[11px] text-neutral-500 hover:text-indigo-400 transition-colors">View All →</Link>
           </div>
-
-          <div className="mt-5 pt-4 border-t border-white/[0.06]">
-            <h4 className="text-[11px] text-neutral-500 font-medium mb-2">MEMORY BANK</h4>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Brain size={14} className="text-indigo-400" />
-                <span className="text-xs text-neutral-400">Files stored</span>
-              </div>
-              <span className="text-sm font-semibold text-white">{memCount}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Tasks + Quick Nav */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="col-span-2 card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-white">Recent Tasks</h3>
-            <Link href="/tasks" className="text-[11px] text-neutral-500 hover:text-indigo-400 transition-colors">View All →</Link>
-          </div>
-          {recentTasks.length === 0 ? (
-            <p className="text-xs text-neutral-600 py-4 text-center">No tasks yet</p>
+          {activity.length === 0 ? (
+            <p className="text-xs text-neutral-600 py-4 text-center">No activity yet</p>
           ) : (
             <div className="space-y-2">
-              {recentTasks.map(t => (
-                <div key={t.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.04]">
-                  <div className={`w-2 h-2 rounded-full ${
-                    t.status === 'done' ? 'bg-green-400' : t.status === 'in_progress' ? 'bg-yellow-400' : 'bg-neutral-500'
-                  }`} />
-                  <span className="text-xs font-medium text-white flex-1 truncate">{t.title}</span>
-                  <span className={`text-[10px] font-medium ${
-                    t.priority === 'urgent' ? 'text-red-400' : t.priority === 'high' ? 'text-orange-400' : t.priority === 'medium' ? 'text-blue-400' : 'text-neutral-500'
-                  }`}>{t.priority}</span>
-                  <span className="text-[10px] text-neutral-600">{t.assignee}</span>
+              {activity.map(e => (
+                <div key={e.id} className="flex items-start gap-2">
+                  <span className="text-sm mt-0.5">{getAgentEmoji(e.agent_id)}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${EVENT_COLORS[e.event_type] || 'text-neutral-400 bg-neutral-500/10'}`}>
+                        {e.event_type.replace('_', ' ').toUpperCase()}
+                      </span>
+                      <span className="text-[10px] text-neutral-600 font-mono">{relativeTime(e.created_at)}</span>
+                    </div>
+                    <p className="text-[11px] text-neutral-300 truncate mt-0.5">{e.title}</p>
+                  </div>
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* Quick Nav */}
-        <div className="card p-5">
-          <h3 className="text-sm font-semibold text-white mb-4">Quick Access</h3>
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              { href: '/tasks', label: 'Tasks', icon: CheckSquare, color: 'text-indigo-400 bg-indigo-500/10' },
-              { href: '/calendar', label: 'Calendar', icon: CalendarDays, color: 'text-green-400 bg-green-500/10' },
-              { href: '/team', label: 'Team', icon: Users, color: 'text-purple-400 bg-purple-500/10' },
-              { href: '/memory', label: 'Memory', icon: Brain, color: 'text-cyan-400 bg-cyan-500/10' },
-              { href: '/content', label: 'Content', icon: Film, color: 'text-orange-400 bg-orange-500/10' },
-              { href: '/office', label: 'Office', icon: Building2, color: 'text-yellow-400 bg-yellow-500/10' },
-            ].map(({ href, label, icon: Icon, color }) => (
-              <Link key={href} href={href} className="flex items-center gap-2 p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.12] transition-all group">
-                <div className={`w-7 h-7 rounded-md flex items-center justify-center ${color}`}>
-                  <Icon size={14} />
+        {/* Upcoming Events or Pipeline */}
+        {hasEvents ? (
+          <div className="card p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                <CalendarDays size={14} className="text-green-400" />
+                Upcoming Events
+              </h3>
+              <Link href="/calendar" className="text-[11px] text-neutral-500 hover:text-green-400 transition-colors">View →</Link>
+            </div>
+            <div className="space-y-3">
+              {events.map(e => (
+                <div key={e.id} className="p-3 rounded-lg bg-white/[0.03] border border-white/[0.06]">
+                  <p className="text-xs font-medium text-white">{e.title}</p>
+                  <p className="text-[10px] text-green-400 mt-1">{formatEventDate(e.date, e.time)}</p>
                 </div>
-                <span className="text-xs text-neutral-400 group-hover:text-white transition-colors">{label}</span>
-              </Link>
-            ))}
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="card p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                <Clock size={14} className="text-purple-400" />
+                Pipeline Health
+              </h3>
+              <Link href="/tasks" className="text-[11px] text-neutral-500 hover:text-purple-400 transition-colors">View Tasks →</Link>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-neutral-500" />
+                  <span className="text-xs text-neutral-400">Backlog</span>
+                </div>
+                <span className="text-sm font-bold text-white">{taskCounts.todo}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-yellow-400" />
+                  <span className="text-xs text-neutral-400">In Progress</span>
+                </div>
+                <span className="text-sm font-bold text-white">{taskCounts.inProgress}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-green-400" />
+                  <span className="text-xs text-neutral-400">Done</span>
+                </div>
+                <span className="text-sm font-bold text-white">{taskCounts.done}</span>
+              </div>
+              <div className="pt-2 border-t border-white/[0.06]">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[10px] text-neutral-500 font-medium">COMPLETION</span>
+                  <span className="text-[11px] text-white font-bold">{donePercent}%</span>
+                </div>
+                <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500"
+                    style={{ width: `${donePercent}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom: Quick stats */}
+      <div className="grid grid-cols-4 gap-4">
+        <div className="card p-4 shimmer-hover">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-7 h-7 rounded-lg bg-indigo-500/15 flex items-center justify-center">
+              <Users size={14} className="text-indigo-400" />
+            </div>
+            <span className="text-[11px] text-neutral-500 font-medium">Fleet Size</span>
+          </div>
+          <p className="text-2xl font-bold text-white">{stations.length}</p>
+          <p className="text-[10px] text-neutral-600 mt-0.5">{workingAgents.length} working now</p>
+        </div>
+
+        <div className="card p-4 shimmer-hover">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-7 h-7 rounded-lg bg-amber-500/15 flex items-center justify-center">
+              <Inbox size={14} className="text-amber-400" />
+            </div>
+            <span className="text-[11px] text-neutral-500 font-medium">Approvals</span>
+          </div>
+          <p className={`text-2xl font-bold ${approvals.length > 0 ? 'text-amber-400' : 'text-white'}`}>{approvals.length}</p>
+          <p className="text-[10px] text-neutral-600 mt-0.5">pending review</p>
+        </div>
+
+        <div className="card p-4 shimmer-hover">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-7 h-7 rounded-lg bg-purple-500/15 flex items-center justify-center">
+              <CheckSquare size={14} className="text-purple-400" />
+            </div>
+            <span className="text-[11px] text-neutral-500 font-medium">Tasks</span>
+          </div>
+          <p className="text-2xl font-bold text-white">{totalTasks}</p>
+          <p className="text-[10px] text-neutral-600 mt-0.5">{taskCounts.inProgress} in progress</p>
+        </div>
+
+        <div className="card p-4 shimmer-hover">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-7 h-7 rounded-lg bg-green-500/15 flex items-center justify-center">
+              <TrendingUp size={14} className="text-green-400" />
+            </div>
+            <span className="text-[11px] text-neutral-500 font-medium">Completion</span>
+          </div>
+          <p className="text-2xl font-bold text-white">{donePercent}%</p>
+          <div className="mt-1 h-1 bg-white/[0.06] rounded-full overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full transition-all" style={{ width: `${donePercent}%` }} />
           </div>
         </div>
       </div>

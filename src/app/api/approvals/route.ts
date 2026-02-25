@@ -34,6 +34,22 @@ export async function POST(req: NextRequest) {
     );
     const result = stmt.run(title, type, agent, content, notes ?? null);
     const row = db.prepare('SELECT * FROM approvals WHERE id = ?').get(result.lastInsertRowid);
+
+    // Auto-create activity feed entry
+    try {
+      db.prepare(
+        'INSERT INTO activity_feed (agent_id, agent_name, event_type, title, detail) VALUES (?, ?, ?, ?, ?)'
+      ).run(
+        agent.toLowerCase().replace(/\s+/g, '-'),
+        agent,
+        'approval',
+        `Submitted for approval: ${title}`,
+        content.slice(0, 100)
+      );
+    } catch {
+      // Don't fail the approval if activity feed insert fails
+    }
+
     return NextResponse.json(row, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Database error';
