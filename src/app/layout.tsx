@@ -4,7 +4,7 @@ import "./globals.css";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { LayoutDashboard, CheckSquare, CalendarDays, Brain, Users, Film, Building2, Zap, Inbox, Activity, Send, Monitor, DollarSign } from "lucide-react";
+import { LayoutDashboard, CheckSquare, CalendarDays, Brain, Users, Film, Building2, Zap, Inbox, Activity, Send, Monitor, DollarSign, LogOut } from "lucide-react";
 
 const navItems = [
   { href: '/', label: 'Overview', icon: LayoutDashboard, exact: true },
@@ -109,6 +109,29 @@ function PingBabbage() {
   );
 }
 
+function LogoutButton() {
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.href = '/login';
+    } catch {
+      window.location.href = '/login';
+    }
+  };
+
+  return (
+    <div className="px-3 mb-1">
+      <button
+        onClick={handleLogout}
+        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12px] font-medium text-neutral-500 hover:text-red-400 hover:bg-red-500/[0.06] transition-all duration-200"
+      >
+        <LogOut size={13} />
+        <span>Logout</span>
+      </button>
+    </div>
+  );
+}
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [pendingApprovals, setPendingApprovals] = useState(0);
@@ -155,6 +178,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   }, [pathname, latestActivityId]);
 
   const hasNewActivity = latestActivityId > seenActivityId && seenActivityId > 0;
+
+  // Login page gets a bare layout (no sidebar)
+  if (pathname === '/login') {
+    return (
+      <html lang="en">
+        <head>
+          <title>Mission Control — Sign In</title>
+          <meta name="description" content="OpenClaw Fleet Dashboard" />
+        </head>
+        <body className="antialiased">{children}</body>
+      </html>
+    );
+  }
 
   return (
     <html lang="en">
@@ -214,6 +250,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </nav>
             <div className="border-t border-white/[0.06]">
               <PingBabbage />
+              <LogoutButton />
               <div className="px-4 pb-4 pt-2">
                 <LiveClock />
                 <div className="flex items-center gap-2">
