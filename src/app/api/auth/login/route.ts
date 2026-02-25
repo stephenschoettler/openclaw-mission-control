@@ -25,7 +25,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const token = createSessionToken();
-  const isProduction = process.env.NODE_ENV === 'production';
+  const isProduction = process.env.SECURE_COOKIES === 'true';
 
   const response = NextResponse.json({ ok: true });
   response.cookies.set(COOKIE_NAME, token, {
