@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ChevronDown, ChevronUp, Activity } from 'lucide-react';
 
 interface ActivityEntry {
@@ -104,26 +104,25 @@ function ActivityCard({ entry }: { entry: ActivityEntry }) {
 }
 
 export default function ActivityPage() {
-  const [entries, setEntries] = useState<ActivityEntry[]>([]);
+  const [allEntries, setAllEntries] = useState<ActivityEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
-  const lastSeenId = useRef(0);
+
+  const entries = filter
+    ? allEntries.filter(e => e.agent_id.toLowerCase().includes(filter.toLowerCase()) || e.agent_name.toLowerCase().includes(filter.toLowerCase()))
+    : allEntries;
 
   const fetchEntries = useCallback(async () => {
     try {
-      const url = filter ? `/api/activity?agent_id=${encodeURIComponent(filter)}` : '/api/activity';
-      const res = await fetch(url);
+      const res = await fetch('/api/activity');
       const data: ActivityEntry[] = await res.json();
-      setEntries(data);
-      if (data.length > 0 && data[0].id > lastSeenId.current) {
-        lastSeenId.current = data[0].id;
-      }
+      setAllEntries(data);
     } catch {
       // silently fail
     } finally {
       setLoading(false);
     }
-  }, [filter]);
+  }, []);
 
   useEffect(() => { fetchEntries(); }, [fetchEntries]);
   useEffect(() => {

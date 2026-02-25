@@ -91,31 +91,38 @@ export default function CommandCenterPage() {
   const [hasEvents, setHasEvents] = useState(false);
 
   const fetchAll = useCallback(async () => {
-    const [oRes, aRes, actRes, eRes, tRes] = await Promise.all([
-      fetch('/api/office'),
-      fetch('/api/approvals?status=pending'),
-      fetch('/api/activity'),
-      fetch('/api/events').catch(() => null),
-      fetch('/api/tasks'),
-    ]);
+    try {
+      const [oRes, aRes, actRes, eRes, tRes] = await Promise.all([
+        fetch('/api/office'),
+        fetch('/api/approvals?status=pending'),
+        fetch('/api/activity'),
+        fetch('/api/events').catch(() => null),
+        fetch('/api/tasks'),
+      ]);
 
-    setStations(await oRes.json());
-    setApprovals(await aRes.json());
-    setActivity((await actRes.json()).slice(0, 5));
-    setTasks(await tRes.json());
-
-    if (eRes) {
-      try {
-        const evData: CalendarEvent[] = await eRes.json();
-        const upcoming = evData
-          .filter(e => new Date(`${e.date}T${e.time || '00:00'}`) >= new Date())
-          .sort((a, b) => new Date(`${a.date}T${a.time || '00:00'}`).getTime() - new Date(`${b.date}T${b.time || '00:00'}`).getTime())
-          .slice(0, 2);
-        setEvents(upcoming);
-        setHasEvents(upcoming.length > 0);
-      } catch {
-        setHasEvents(false);
+      if (oRes.ok) setStations(await oRes.json());
+      if (aRes.ok) setApprovals(await aRes.json());
+      if (actRes.ok) {
+        const actData: ActivityEntry[] = await actRes.json();
+        setActivity(actData.slice(0, 5));
       }
+      if (tRes.ok) setTasks(await tRes.json());
+
+      if (eRes && eRes.ok) {
+        try {
+          const evData: CalendarEvent[] = await eRes.json();
+          const upcoming = evData
+            .filter(e => new Date(`${e.date}T${e.time || '00:00'}`) >= new Date())
+            .sort((a, b) => new Date(`${a.date}T${a.time || '00:00'}`).getTime() - new Date(`${b.date}T${b.time || '00:00'}`).getTime())
+            .slice(0, 2);
+          setEvents(upcoming);
+          setHasEvents(upcoming.length > 0);
+        } catch {
+          setHasEvents(false);
+        }
+      }
+    } catch {
+      // silently fail — keep stale data visible
     }
   }, []);
 
