@@ -4,13 +4,14 @@ import "./globals.css";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { LayoutDashboard, CheckSquare, CalendarDays, Brain, Users, Film, Building2, Zap } from "lucide-react";
+import { LayoutDashboard, CheckSquare, CalendarDays, Brain, Users, Film, Building2, Zap, Inbox } from "lucide-react";
 
 const navItems = [
   { href: '/', label: 'Overview', icon: LayoutDashboard, exact: true },
   { href: '/tasks', label: 'Tasks', icon: CheckSquare },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays },
   { href: '/crons', label: 'Crons', icon: Zap },
+  { href: '/approvals', label: 'Approvals', icon: Inbox },
   { href: '/memory', label: 'Memory', icon: Brain },
   { href: '/team', label: 'Team', icon: Users },
   { href: '/content', label: 'Content', icon: Film },
@@ -30,6 +31,22 @@ function LiveClock() {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [pendingApprovals, setPendingApprovals] = useState(0);
+
+  useEffect(() => {
+    const fetchPending = async () => {
+      try {
+        const res = await fetch('/api/approvals?status=pending');
+        const data: unknown[] = await res.json();
+        setPendingApprovals(Array.isArray(data) ? data.length : 0);
+      } catch {
+        // silently fail
+      }
+    };
+    fetchPending();
+    const id = setInterval(fetchPending, 30000);
+    return () => clearInterval(id);
+  }, []);
 
   return (
     <html lang="en">
@@ -58,6 +75,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <nav className="flex-1 px-3 space-y-0.5 mt-1">
               {navItems.map(({ href, label, icon: Icon, exact }) => {
                 const active = exact ? pathname === href : pathname.startsWith(href);
+                const isApprovals = href === '/approvals';
+                const showBadge = isApprovals && pendingApprovals > 0;
                 return (
                   <Link
                     key={href}
@@ -70,7 +89,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   >
                     <Icon size={16} className={active ? 'text-indigo-400' : ''} />
                     {label}
-                    {active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-400" />}
+                    {showBadge ? (
+                      <span className="ml-auto text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full px-1.5 py-0.5 min-w-[18px] text-center leading-none">
+                        {pendingApprovals > 99 ? '99+' : pendingApprovals}
+                      </span>
+                    ) : (
+                      active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                    )}
                   </Link>
                 );
               })}
