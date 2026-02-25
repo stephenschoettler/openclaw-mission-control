@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Trash2, Zap } from 'lucide-react';
 
 interface CalEvent {
   id: number;
@@ -23,7 +23,6 @@ interface CronJob {
 }
 
 function parseCronNextDate(schedule: string, year: number, month: number): number[] {
-  // Simple cron parser: extract day-of-month and day-of-week info
   const parts = schedule.split(/\s+/);
   if (parts.length < 5) return [];
 
@@ -31,30 +30,25 @@ function parseCronNextDate(schedule: string, year: number, month: number): numbe
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const days: number[] = [];
 
-  // Check if this month matches
   if (monthField !== '*' && !monthField.includes(String(month + 1))) {
-    // Check for ranges/lists
     const monthNums = expandCronField(monthField, 1, 12);
     if (!monthNums.includes(month + 1)) return [];
   }
 
   if (dayOfMonth !== '*' && dayOfWeek === '*') {
-    // Specific day of month
     const domNums = expandCronField(dayOfMonth, 1, daysInMonth);
     days.push(...domNums.filter(d => d <= daysInMonth));
   } else if (dayOfWeek !== '*' && dayOfMonth === '*') {
-    // Specific day of week (0=Sun, 6=Sat)
     const dowNums = expandCronField(dayOfWeek, 0, 6);
     for (let d = 1; d <= daysInMonth; d++) {
       const dow = new Date(year, month, d).getDay();
       if (dowNums.includes(dow)) days.push(d);
     }
   } else if (dayOfMonth === '*' && dayOfWeek === '*') {
-    // Every day
     for (let d = 1; d <= daysInMonth; d++) days.push(d);
   }
 
-  void minute; void hour; // Used for display only
+  void minute; void hour;
   return days;
 }
 
@@ -77,6 +71,14 @@ function expandCronField(field: string, min: number, max: number): number[] {
   }
   return result;
 }
+
+const CRON_COLORS = [
+  { bg: 'bg-indigo-500/20', text: 'text-indigo-300', border: 'border-indigo-500/30' },
+  { bg: 'bg-purple-500/20', text: 'text-purple-300', border: 'border-purple-500/30' },
+  { bg: 'bg-cyan-500/20', text: 'text-cyan-300', border: 'border-cyan-500/30' },
+  { bg: 'bg-pink-500/20', text: 'text-pink-300', border: 'border-pink-500/30' },
+  { bg: 'bg-amber-500/20', text: 'text-amber-300', border: 'border-amber-500/30' },
+];
 
 export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -116,10 +118,11 @@ export default function CalendarPage() {
   const firstDow = new Date(year, month, 1).getDay();
   const today = new Date();
 
+  const activeCrons = crons.filter(c => c.enabled !== false);
+
   // Build cron schedule for this month
   const cronDays: Record<number, CronJob[]> = {};
-  for (const cron of crons) {
-    if (cron.enabled === false) continue;
+  for (const cron of activeCrons) {
     const scheduleExpr = typeof cron.schedule === 'string' ? cron.schedule : cron.schedule?.expr ?? '';
     const days = parseCronNextDate(scheduleExpr, year, month);
     for (const d of days) {
@@ -128,27 +131,55 @@ export default function CalendarPage() {
     }
   }
 
+  // Assign stable colors to cron jobs
+  const cronColorMap = new Map<string, typeof CRON_COLORS[0]>();
+  activeCrons.forEach((c, i) => cronColorMap.set(c.id, CRON_COLORS[i % CRON_COLORS.length]));
+
   const monthStr = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-white">Calendar</h2>
-        <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-sm transition-colors">
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h2 className="text-2xl font-extrabold gradient-text tracking-tight">Calendar</h2>
+          <p className="text-xs text-neutral-500 mt-1">Scheduled tasks & events</p>
+        </div>
+        <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-sm font-medium transition-all hover:shadow-lg hover:shadow-indigo-500/20">
           <Plus size={16} /> Add Event
         </button>
       </div>
 
+      {/* Always Running crons */}
+      {activeCrons.length > 0 && (
+        <div className="card p-4 mb-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Zap size={14} className="text-indigo-400" />
+            <span className="text-xs font-semibold text-neutral-300">Always Running</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {activeCrons.map(c => {
+              const scheduleExpr = typeof c.schedule === 'string' ? c.schedule : c.schedule?.expr ?? '';
+              const color = cronColorMap.get(c.id) || CRON_COLORS[0];
+              return (
+                <span key={c.id} className={`text-[11px] px-2.5 py-1 rounded-full ${color.bg} ${color.text} border ${color.border} font-medium`}>
+                  {c.name || c.label || c.id} · {scheduleExpr}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {showForm && (
-        <div className="mb-6 p-4 bg-white/[0.03] border border-white/[0.06] rounded-xl">
+        <div className="mb-5 p-4 card">
           <div className="grid grid-cols-2 gap-3 mb-3">
-            <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Event title" className="col-span-2 px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white placeholder-neutral-500 outline-none focus:border-indigo-500" />
+            <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Event title" className="col-span-2 px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white placeholder-neutral-500 outline-none focus:border-indigo-500 transition-colors" />
             <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className="px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white outline-none [color-scheme:dark]" />
             <input type="time" value={form.time} onChange={e => setForm({ ...form, time: e.target.value })} className="px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white outline-none [color-scheme:dark]" />
-            <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Notes (optional)" rows={2} className="col-span-2 px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white placeholder-neutral-500 outline-none focus:border-indigo-500 resize-none" />
+            <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Notes (optional)" rows={2} className="col-span-2 px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white placeholder-neutral-500 outline-none focus:border-indigo-500 resize-none transition-colors" />
           </div>
           <div className="flex gap-2">
-            <button onClick={addEvent} className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-sm">Add</button>
+            <button onClick={addEvent} className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-sm font-medium">Add</button>
             <button onClick={() => setShowForm(false)} className="px-4 py-2 bg-white/[0.06] hover:bg-white/[0.1] text-neutral-300 rounded-lg text-sm">Cancel</button>
           </div>
         </div>
@@ -156,24 +187,22 @@ export default function CalendarPage() {
 
       {/* Month nav */}
       <div className="flex items-center justify-between mb-4">
-        <button onClick={prevMonth} className="p-2 hover:bg-white/[0.06] rounded-lg text-neutral-400"><ChevronLeft size={20} /></button>
-        <h3 className="text-lg font-semibold text-white">{monthStr}</h3>
-        <button onClick={nextMonth} className="p-2 hover:bg-white/[0.06] rounded-lg text-neutral-400"><ChevronRight size={20} /></button>
+        <button onClick={prevMonth} className="p-2 hover:bg-white/[0.06] rounded-lg text-neutral-400 transition-colors"><ChevronLeft size={20} /></button>
+        <h3 className="text-lg font-bold text-white">{monthStr}</h3>
+        <button onClick={nextMonth} className="p-2 hover:bg-white/[0.06] rounded-lg text-neutral-400 transition-colors"><ChevronRight size={20} /></button>
       </div>
 
       {/* Calendar grid */}
-      <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl overflow-hidden">
+      <div className="card overflow-hidden">
         <div className="grid grid-cols-7">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-            <div key={d} className="p-2 text-center text-xs font-medium text-neutral-500 border-b border-white/[0.06]">{d}</div>
+            <div key={d} className="p-2.5 text-center text-[11px] font-semibold text-neutral-500 border-b border-white/[0.06] uppercase tracking-wider">{d}</div>
           ))}
         </div>
         <div className="grid grid-cols-7">
-          {/* Empty cells for offset */}
           {Array.from({ length: firstDow }).map((_, i) => (
             <div key={`e-${i}`} className="min-h-[100px] p-2 border-b border-r border-white/[0.04]" />
           ))}
-          {/* Day cells */}
           {Array.from({ length: daysInMonth }).map((_, i) => {
             const day = i + 1;
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -181,18 +210,21 @@ export default function CalendarPage() {
             const dayCrons = cronDays[day] || [];
             const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
             return (
-              <div key={day} className={`min-h-[100px] p-2 border-b border-r border-white/[0.04] ${isToday ? 'bg-indigo-500/5' : ''}`}>
-                <span className={`text-xs font-medium ${isToday ? 'text-indigo-400 bg-indigo-500/20 w-6 h-6 flex items-center justify-center rounded-full' : 'text-neutral-400'}`}>{day}</span>
+              <div key={day} className={`min-h-[100px] p-2 border-b border-r border-white/[0.04] transition-colors ${isToday ? 'bg-indigo-500/[0.07]' : 'hover:bg-white/[0.02]'}`}>
+                <span className={`text-xs font-semibold inline-flex items-center justify-center ${isToday ? 'text-white bg-indigo-500 w-6 h-6 rounded-full' : 'text-neutral-500'}`}>{day}</span>
                 <div className="mt-1 space-y-0.5">
-                  {dayCrons.map(c => (
-                    <div key={c.id} className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 truncate" title={c.name || c.label || c.id}>
-                      {c.name || c.label || c.id}
-                    </div>
-                  ))}
+                  {dayCrons.map(c => {
+                    const color = cronColorMap.get(c.id) || CRON_COLORS[0];
+                    return (
+                      <div key={c.id} className={`text-[9px] px-1.5 py-0.5 rounded ${color.bg} ${color.text} truncate font-medium`} title={c.name || c.label || c.id}>
+                        {c.name || c.label || c.id}
+                      </div>
+                    );
+                  })}
                   {dayEvents.map(ev => (
-                    <div key={ev.id} className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/15 text-green-300 truncate flex items-center gap-1 group">
+                    <div key={ev.id} className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-300 truncate flex items-center gap-1 group border border-green-500/20">
                       <span className="truncate flex-1">{ev.time && `${ev.time} `}{ev.title}</span>
-                      <button onClick={() => deleteEvent(ev.id)} className="opacity-0 group-hover:opacity-100 flex-shrink-0"><Trash2 size={10} /></button>
+                      <button onClick={() => deleteEvent(ev.id)} className="opacity-0 group-hover:opacity-100 flex-shrink-0 transition-opacity"><Trash2 size={9} /></button>
                     </div>
                   ))}
                 </div>

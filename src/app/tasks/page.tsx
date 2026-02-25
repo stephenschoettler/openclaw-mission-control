@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Trash2, ChevronRight, ChevronLeft, GripVertical } from 'lucide-react';
+import { Plus, Trash2, ChevronRight, ChevronLeft } from 'lucide-react';
 
 interface Task {
   id: number;
@@ -14,20 +14,28 @@ interface Task {
 }
 
 const COLUMNS = [
-  { id: 'backlog', label: 'Backlog' },
-  { id: 'in_progress', label: 'In Progress' },
-  { id: 'done', label: 'Done' },
+  { id: 'backlog', label: 'Backlog', dot: 'bg-neutral-400', accent: 'col-accent-blue' },
+  { id: 'in_progress', label: 'In Progress', dot: 'bg-yellow-400', accent: 'col-accent-yellow' },
+  { id: 'done', label: 'Done', dot: 'bg-green-400', accent: 'col-accent-green' },
 ];
 
 const ASSIGNEES = ['me', 'Babbage', 'Hustle', 'Code Monkey', 'Roadie', 'TLDR', 'Answring Ops'];
 const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
 
-const priorityColor: Record<string, string> = {
-  low: 'text-neutral-400',
-  medium: 'text-blue-400',
-  high: 'text-orange-400',
-  urgent: 'text-red-400',
+const priorityConfig: Record<string, { color: string; border: string }> = {
+  low: { color: 'text-neutral-400', border: 'border-l-neutral-500' },
+  medium: { color: 'text-blue-400', border: 'border-l-blue-500' },
+  high: { color: 'text-orange-400', border: 'border-l-orange-500' },
+  urgent: { color: 'text-red-400', border: 'border-l-red-500' },
 };
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const days = Math.floor(diff / 86400000);
+  if (days === 0) return 'today';
+  if (days === 1) return '1 day ago';
+  return `${days} days ago`;
+}
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -74,21 +82,44 @@ export default function TasksPage() {
     setShowForm(true);
   };
 
+  const inProgress = tasks.filter(t => t.status === 'in_progress').length;
+  const done = tasks.filter(t => t.status === 'done').length;
+  const completion = tasks.length > 0 ? Math.round((done / tasks.length) * 100) : 0;
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-white">Tasks Board</h2>
-        <button onClick={() => { setEditingTask(null); setForm({ title: '', description: '', assignee: 'me', priority: 'medium', status: 'backlog' }); setShowForm(true); }} className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-sm transition-colors">
-          <Plus size={16} /> Add Task
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h2 className="text-2xl font-extrabold gradient-text tracking-tight">Tasks Board</h2>
+        </div>
+        <button onClick={() => { setEditingTask(null); setForm({ title: '', description: '', assignee: 'me', priority: 'medium', status: 'backlog' }); setShowForm(true); }} className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-sm font-medium transition-all hover:shadow-lg hover:shadow-indigo-500/20">
+          <Plus size={16} /> New task
         </button>
+      </div>
+
+      {/* Stats Bar */}
+      <div className="flex items-center gap-6 mb-5 px-1">
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-xl font-bold text-white">{inProgress}</span>
+          <span className="text-xs text-neutral-500">In progress</span>
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-xl font-bold text-white">{tasks.length}</span>
+          <span className="text-xs text-neutral-500">Total</span>
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <span className={`text-xl font-bold ${completion >= 50 ? 'text-green-400' : 'text-white'}`}>{completion}%</span>
+          <span className="text-xs text-neutral-500">Completion</span>
+        </div>
       </div>
 
       {/* Add/Edit Form */}
       {showForm && (
-        <div className="mb-6 p-4 bg-white/[0.03] border border-white/[0.06] rounded-xl">
+        <div className="mb-6 p-4 card">
           <div className="grid grid-cols-2 gap-3 mb-3">
-            <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Task title" className="col-span-2 px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white placeholder-neutral-500 outline-none focus:border-indigo-500" />
-            <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Description (optional)" rows={2} className="col-span-2 px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white placeholder-neutral-500 outline-none focus:border-indigo-500 resize-none" />
+            <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Task title" className="col-span-2 px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white placeholder-neutral-500 outline-none focus:border-indigo-500 transition-colors" />
+            <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Description (optional)" rows={2} className="col-span-2 px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white placeholder-neutral-500 outline-none focus:border-indigo-500 resize-none transition-colors" />
             <select value={form.assignee} onChange={e => setForm({ ...form, assignee: e.target.value })} className="px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white outline-none">
               {ASSIGNEES.map(a => <option key={a} value={a} className="bg-neutral-900">{a}</option>)}
             </select>
@@ -97,7 +128,7 @@ export default function TasksPage() {
             </select>
           </div>
           <div className="flex gap-2">
-            <button onClick={handleSubmit} className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-sm">{editingTask ? 'Update' : 'Create'}</button>
+            <button onClick={handleSubmit} className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-sm font-medium">{editingTask ? 'Update' : 'Create'}</button>
             <button onClick={() => { setShowForm(false); setEditingTask(null); }} className="px-4 py-2 bg-white/[0.06] hover:bg-white/[0.1] text-neutral-300 rounded-lg text-sm">Cancel</button>
           </div>
         </div>
@@ -108,37 +139,43 @@ export default function TasksPage() {
         {COLUMNS.map(col => {
           const colTasks = tasks.filter(t => t.status === col.id);
           return (
-            <div key={col.id} className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-4">
+            <div key={col.id} className={`card p-4 ${col.accent}`}>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-neutral-300">{col.label}</h3>
-                <span className="text-xs text-neutral-500 bg-white/[0.04] px-2 py-0.5 rounded-full">{colTasks.length}</span>
+                <div className="flex items-center gap-2">
+                  <div className={`w-2.5 h-2.5 rounded-full ${col.dot}`} />
+                  <h3 className="text-sm font-semibold text-neutral-300">{col.label}</h3>
+                </div>
+                <span className="text-xs text-neutral-500 bg-white/[0.06] px-2 py-0.5 rounded-full font-medium">{colTasks.length}</span>
               </div>
               {colTasks.length === 0 ? (
-                <p className="text-xs text-neutral-600 text-center py-8">No tasks in {col.label.toLowerCase()}</p>
+                <p className="text-xs text-neutral-600 text-center py-8">No tasks</p>
               ) : (
                 <div className="space-y-2">
-                  {colTasks.map(task => (
-                    <div key={task.id} className="p-3 bg-white/[0.03] border border-white/[0.06] rounded-lg group hover:border-white/[0.12] transition-colors">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <button onClick={() => startEdit(task)} className="text-sm font-medium text-white hover:text-indigo-400 text-left truncate block w-full">{task.title}</button>
-                          {task.description && <p className="text-xs text-neutral-500 mt-1 line-clamp-2">{task.description}</p>}
+                  {colTasks.map(task => {
+                    const pCfg = priorityConfig[task.priority] || priorityConfig.medium;
+                    return (
+                      <div key={task.id} className={`p-3 bg-white/[0.03] border border-white/[0.06] border-l-2 ${pCfg.border} rounded-lg group hover:border-white/[0.12] hover:bg-white/[0.04] transition-all`}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <button onClick={() => startEdit(task)} className="text-sm font-medium text-white hover:text-indigo-400 text-left truncate block w-full transition-colors">{task.title}</button>
+                            {task.description && <p className="text-xs text-neutral-500 mt-1 line-clamp-2">{task.description}</p>}
+                          </div>
                         </div>
-                        <GripVertical size={14} className="text-neutral-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex items-center justify-between mt-2.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] bg-white/[0.06] text-neutral-400 px-1.5 py-0.5 rounded font-medium">{task.assignee}</span>
+                            <span className={`text-[10px] font-semibold ${pCfg.color}`}>{task.priority}</span>
+                          </div>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => moveTask(task, 'left')} className="p-0.5 hover:text-white text-neutral-600 transition-colors" title="Move left"><ChevronLeft size={14} /></button>
+                            <button onClick={() => moveTask(task, 'right')} className="p-0.5 hover:text-white text-neutral-600 transition-colors" title="Move right"><ChevronRight size={14} /></button>
+                            <button onClick={() => deleteTask(task.id)} className="p-0.5 hover:text-red-400 text-neutral-600 transition-colors" title="Delete"><Trash2 size={14} /></button>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-neutral-600 mt-1.5">{timeAgo(task.created_at)}</p>
                       </div>
-                      <div className="flex items-center justify-between mt-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] bg-white/[0.06] text-neutral-400 px-1.5 py-0.5 rounded">{task.assignee}</span>
-                          <span className={`text-[10px] font-medium ${priorityColor[task.priority]}`}>{task.priority}</span>
-                        </div>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => moveTask(task, 'left')} className="p-0.5 hover:text-white text-neutral-500" title="Move left"><ChevronLeft size={14} /></button>
-                          <button onClick={() => moveTask(task, 'right')} className="p-0.5 hover:text-white text-neutral-500" title="Move right"><ChevronRight size={14} /></button>
-                          <button onClick={() => deleteTask(task.id)} className="p-0.5 hover:text-red-400 text-neutral-500" title="Delete"><Trash2 size={14} /></button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
