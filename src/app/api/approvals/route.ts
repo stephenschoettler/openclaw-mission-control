@@ -50,6 +50,15 @@ export async function POST(req: NextRequest) {
       // Don't fail the approval if activity feed insert fails
     }
 
+    // Fire-and-forget Telegram notification — never blocks or fails the response
+    fetch('http://localhost:3001/api/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: `📋 New approval request: "${title}" from ${agent}\n\nCheck Mission Control: http://localhost:3001/approvals`
+      })
+    }).catch(() => {});
+
     return NextResponse.json(row, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Database error';
