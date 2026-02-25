@@ -77,8 +77,14 @@ function getAgentEmoji(agentId: string): string {
   return '🤖';
 }
 
+function parseUtc(dateStr: string): Date {
+  // SQLite timestamps are UTC "YYYY-MM-DD HH:MM:SS" — append 'Z' to force UTC parsing.
+  const iso = dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T') + 'Z';
+  return new Date(iso);
+}
+
 function relativeTime(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
+  const diff = Date.now() - parseUtc(dateStr).getTime();
   const s = Math.floor(diff / 1000);
   if (s < 60) return `${s}s ago`;
   const m = Math.floor(s / 60);

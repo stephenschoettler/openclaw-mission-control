@@ -30,8 +30,16 @@ const priorityConfig: Record<string, { color: string; border: string }> = {
   urgent: { color: 'text-red-400', border: 'border-l-red-500' },
 };
 
+function parseUtc(dateStr: string): Date {
+  // SQLite stores timestamps as "YYYY-MM-DD HH:MM:SS" (UTC, no timezone suffix).
+  // Appending 'Z' (or replacing the space with 'T' + 'Z') forces UTC interpretation
+  // so that machines in non-UTC timezones don't show future/past offsets.
+  const iso = dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T') + 'Z';
+  return new Date(iso);
+}
+
 function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
+  const diff = Date.now() - parseUtc(dateStr).getTime();
   const days = Math.floor(diff / 86400000);
   if (days === 0) return 'today';
   if (days === 1) return '1 day ago';

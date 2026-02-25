@@ -23,6 +23,12 @@ const TYPE_CONFIG: Record<string, { label: string; color: string; bg: string }> 
   other:     { label: 'Other',     color: 'text-neutral-400', bg: 'bg-white/[0.06] border-white/[0.1]' },
 };
 
+function parseUtc(dateStr: string): Date {
+  // SQLite timestamps are UTC "YYYY-MM-DD HH:MM:SS" — append 'Z' to force UTC parsing.
+  const iso = dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T') + 'Z';
+  return new Date(iso);
+}
+
 function TypeBadge({ type }: { type: string }) {
   const cfg = TYPE_CONFIG[type] ?? TYPE_CONFIG.other;
   return (
@@ -79,7 +85,7 @@ function ApprovalCard({
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <TypeBadge type={approval.type} />
             <span className="text-[10px] text-neutral-500">by {approval.agent}</span>
-            <span className="text-[10px] text-neutral-600 ml-auto">{new Date(approval.created_at).toLocaleString()}</span>
+            <span className="text-[10px] text-neutral-600 ml-auto">{parseUtc(approval.created_at).toLocaleString()}</span>
           </div>
           <h3 className="text-sm font-bold text-white">{approval.title}</h3>
         </div>
@@ -157,7 +163,7 @@ function HistoryCard({ approval }: { approval: Approval }) {
         </span>
         <TypeBadge type={approval.type} />
         <span className="text-[10px] text-neutral-600">by {approval.agent}</span>
-        <span className="text-[10px] text-neutral-700 ml-auto">{new Date(approval.updated_at).toLocaleString()}</span>
+        <span className="text-[10px] text-neutral-700 ml-auto">{parseUtc(approval.updated_at).toLocaleString()}</span>
       </div>
       <p className="text-xs font-semibold text-neutral-300 mb-1">{approval.title}</p>
       <p className="text-[11px] text-neutral-600 whitespace-pre-wrap">
