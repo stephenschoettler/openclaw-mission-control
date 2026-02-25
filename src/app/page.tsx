@@ -167,7 +167,7 @@ export default function CommandCenterPage() {
   return (
     <div className="max-w-6xl mx-auto">
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="text-3xl font-extrabold gradient-text tracking-tight">Command Center</h1>
         <p className="text-sm text-neutral-500 mt-1">Live fleet status — refreshes every 15s</p>
       </div>
@@ -223,8 +223,9 @@ export default function CommandCenterPage() {
         </div>
 
         {workingAgents.length === 0 ? (
-          <div className="card p-4 text-center">
+          <div className="py-6 px-4 text-center border border-dashed border-white/[0.05] rounded-xl">
             <p className="text-xs text-neutral-600">No agents currently working</p>
+            <p className="text-[10px] text-neutral-700 mt-0.5">Agents will appear here when they pick up tasks</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -250,13 +251,26 @@ export default function CommandCenterPage() {
         )}
 
         {/* Idle agents summary */}
-        {stations.filter(s => s.status !== 'working').length > 0 && (
-          <div className="mt-2 flex items-center gap-2">
-            <p className="text-[11px] text-neutral-600">
-              Also online: {stations.filter(s => s.status !== 'working').map(s => s.agent_name).join(', ')}
-            </p>
-          </div>
-        )}
+        {stations.filter(s => s.status !== 'working').length > 0 && (() => {
+          const idleAgents = stations.filter(s => s.status !== 'working');
+          const MAX_SHOW = 8;
+          const shown = idleAgents.slice(0, MAX_SHOW);
+          const overflow = idleAgents.length - MAX_SHOW;
+          return (
+            <div className="mt-3 flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-semibold text-neutral-700 uppercase tracking-widest shrink-0">Also online</span>
+              {shown.map(s => (
+                <span key={s.agent_id} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.06] text-[11px] text-neutral-500">
+                  <span className="w-1.5 h-1.5 rounded-full bg-yellow-400/50 shrink-0" />
+                  {s.agent_name}
+                </span>
+              ))}
+              {overflow > 0 && (
+                <span className="text-[11px] text-neutral-600">+{overflow} more</span>
+              )}
+            </div>
+          );
+        })()}
       </section>
 
       {/* Middle row: Approvals + Activity + Events */}
@@ -270,28 +284,31 @@ export default function CommandCenterPage() {
             </h3>
             <Link href="/approvals" className="text-[11px] text-neutral-500 hover:text-amber-400 transition-colors">View →</Link>
           </div>
-          <div className="flex items-center gap-3">
-            <div className={`text-4xl font-extrabold ${approvals.length > 0 ? 'text-amber-400' : 'text-neutral-600'}`}>
-              {approvals.length}
+          {approvals.length === 0 ? (
+            <div className="py-4 text-center border border-dashed border-white/[0.06] rounded-lg mt-2">
+              <div className="text-3xl font-extrabold text-neutral-700">0</div>
+              <p className="text-[11px] text-neutral-600 mt-1">All clear</p>
             </div>
-            {approvals.length > 0 && (
-              <div className="flex items-center gap-1.5">
-                <AlertCircle size={16} className="text-amber-400" />
-                <span className="text-xs text-amber-400 font-medium">Needs review</span>
-              </div>
-            )}
-          </div>
-          {approvals.length > 0 && (
-            <div className="mt-3 space-y-1.5">
-              {approvals.slice(0, 3).map(a => (
-                <div key={a.id} className="text-[11px] text-neutral-400 flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-                  <span className="truncate">{a.title}</span>
+          ) : (
+            <div>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="text-4xl font-extrabold text-amber-400">{approvals.length}</div>
+                <div className="flex items-center gap-1.5">
+                  <AlertCircle size={16} className="text-amber-400" />
+                  <span className="text-xs text-amber-400 font-medium">Needs review</span>
                 </div>
-              ))}
-              {approvals.length > 3 && (
-                <p className="text-[10px] text-neutral-600">+{approvals.length - 3} more</p>
-              )}
+              </div>
+              <div className="space-y-1.5">
+                {approvals.slice(0, 3).map(a => (
+                  <div key={a.id} className="text-[11px] text-neutral-400 flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                    <span className="truncate">{a.title}</span>
+                  </div>
+                ))}
+                {approvals.length > 3 && (
+                  <p className="text-[10px] text-neutral-600">+{approvals.length - 3} more</p>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -306,7 +323,10 @@ export default function CommandCenterPage() {
             <Link href="/activity" className="text-[11px] text-neutral-500 hover:text-indigo-400 transition-colors">View All →</Link>
           </div>
           {activity.length === 0 ? (
-            <p className="text-xs text-neutral-600 py-4 text-center">No activity yet</p>
+            <div className="py-6 text-center border border-dashed border-white/[0.06] rounded-lg">
+              <p className="text-xs text-neutral-600">No activity yet</p>
+              <p className="text-[10px] text-neutral-700 mt-0.5">Events will appear here as agents report them</p>
+            </div>
           ) : (
             <div className="space-y-2">
               {activity.map(e => (
@@ -382,10 +402,10 @@ export default function CommandCenterPage() {
                   <span className="text-[10px] text-neutral-500 font-medium">COMPLETION</span>
                   <span className="text-[11px] text-white font-bold">{donePercent}%</span>
                 </div>
-                <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+                <div className="h-1.5 bg-white/[0.1] rounded-full overflow-hidden">
                   <div
                     className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500"
-                    style={{ width: `${donePercent}%` }}
+                    style={{ width: `${Math.max(donePercent, donePercent > 0 ? 4 : 0)}%` }}
                   />
                 </div>
               </div>
@@ -395,61 +415,65 @@ export default function CommandCenterPage() {
       </div>
 
       {/* Bottom: Quick stats */}
-      <div className="grid grid-cols-5 gap-4">
-        <div className="card p-4 shimmer-hover">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-7 h-7 rounded-lg bg-indigo-500/15 flex items-center justify-center">
-              <Users size={14} className="text-indigo-400" />
+      <div className="grid grid-cols-5 gap-3">
+        <div className="card p-4 shimmer-hover relative overflow-hidden">
+          <div className="flex items-center gap-2 mb-2.5">
+            <div className="w-8 h-8 rounded-lg bg-indigo-500/15 flex items-center justify-center shrink-0">
+              <Users size={15} className="text-indigo-400" />
             </div>
-            <span className="text-[11px] text-neutral-500 font-medium">Fleet Size</span>
+            <span className="text-[11px] text-neutral-500 font-semibold tracking-wide">Fleet Size</span>
           </div>
-          <p className="text-2xl font-bold text-white">{stations.length}</p>
+          <p className="text-2xl font-extrabold text-white">{stations.length}</p>
           <p className="text-[10px] text-neutral-600 mt-0.5">{workingAgents.length} working now</p>
         </div>
 
-        <div className="card p-4 shimmer-hover">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-7 h-7 rounded-lg bg-amber-500/15 flex items-center justify-center">
-              <Inbox size={14} className="text-amber-400" />
+        <div className="card p-4 shimmer-hover relative overflow-hidden">
+          <div className="flex items-center gap-2 mb-2.5">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center shrink-0">
+              <Inbox size={15} className="text-amber-400" />
             </div>
-            <span className="text-[11px] text-neutral-500 font-medium">Approvals</span>
+            <span className="text-[11px] text-neutral-500 font-semibold tracking-wide">Approvals</span>
           </div>
-          <p className={`text-2xl font-bold ${approvals.length > 0 ? 'text-amber-400' : 'text-white'}`}>{approvals.length}</p>
+          <p className={`text-2xl font-extrabold ${approvals.length > 0 ? 'text-amber-400' : 'text-white'}`}>{approvals.length}</p>
           <p className="text-[10px] text-neutral-600 mt-0.5">pending review</p>
         </div>
 
-        <div className="card p-4 shimmer-hover">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-7 h-7 rounded-lg bg-purple-500/15 flex items-center justify-center">
-              <CheckSquare size={14} className="text-purple-400" />
+        <div className="card p-4 shimmer-hover relative overflow-hidden">
+          <div className="flex items-center gap-2 mb-2.5">
+            <div className="w-8 h-8 rounded-lg bg-purple-500/15 flex items-center justify-center shrink-0">
+              <CheckSquare size={15} className="text-purple-400" />
             </div>
-            <span className="text-[11px] text-neutral-500 font-medium">Tasks</span>
+            <span className="text-[11px] text-neutral-500 font-semibold tracking-wide">Tasks</span>
           </div>
-          <p className="text-2xl font-bold text-white">{totalTasks}</p>
+          <p className={`text-2xl font-extrabold ${totalTasks === 0 ? 'text-neutral-600' : 'text-white'}`}>{totalTasks}</p>
           <p className="text-[10px] text-neutral-600 mt-0.5">{taskCounts.inProgress} in progress</p>
         </div>
 
-        <div className="card p-4 shimmer-hover">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-7 h-7 rounded-lg bg-green-500/15 flex items-center justify-center">
-              <TrendingUp size={14} className="text-green-400" />
+        <div className="card p-4 shimmer-hover relative overflow-hidden">
+          <div className="flex items-center gap-2 mb-2.5">
+            <div className="w-8 h-8 rounded-lg bg-green-500/15 flex items-center justify-center shrink-0">
+              <TrendingUp size={15} className="text-green-400" />
             </div>
-            <span className="text-[11px] text-neutral-500 font-medium">Completion</span>
+            <span className="text-[11px] text-neutral-500 font-semibold tracking-wide">Completion</span>
           </div>
-          <p className="text-2xl font-bold text-white">{donePercent}%</p>
-          <div className="mt-1 h-1 bg-white/[0.06] rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full transition-all" style={{ width: `${donePercent}%` }} />
+          <p className={`text-2xl font-extrabold ${donePercent === 0 ? 'text-neutral-600' : 'text-white'}`}>{donePercent}%</p>
+          <div className="mt-1.5 h-1.5 bg-white/[0.1] rounded-full overflow-hidden">
+            {donePercent > 0 ? (
+              <div className="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full transition-all duration-500" style={{ width: `${donePercent}%` }} />
+            ) : (
+              <div className="h-full w-full rounded-full bg-white/[0.04]" />
+            )}
           </div>
         </div>
 
-        <Link href="/costs" className="card p-4 shimmer-hover block">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-7 h-7 rounded-lg bg-emerald-500/15 flex items-center justify-center">
-              <DollarSign size={14} className="text-emerald-400" />
+        <Link href="/costs" className="card p-4 shimmer-hover block relative overflow-hidden">
+          <div className="flex items-center gap-2 mb-2.5">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0">
+              <DollarSign size={15} className="text-emerald-400" />
             </div>
-            <span className="text-[11px] text-neutral-500 font-medium">Today&apos;s Cost</span>
+            <span className="text-[11px] text-neutral-500 font-semibold tracking-wide">Today&apos;s Cost</span>
           </div>
-          <p className="text-2xl font-bold text-white">
+          <p className="text-2xl font-extrabold text-white">
             {todayCost !== null ? `$${todayCost.toFixed(2)}` : '—'}
           </p>
           <p className="text-[10px] text-neutral-600 mt-0.5">token spend</p>

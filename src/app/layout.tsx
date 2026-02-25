@@ -191,13 +191,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <Link
                     key={href}
                     href={href}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-200 ${
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-150 ${
                       active
-                        ? 'bg-indigo-500/12 text-white nav-glow'
-                        : 'text-neutral-500 hover:text-neutral-200 hover:bg-white/[0.04]'
+                        ? 'bg-indigo-500/[0.15] text-white border border-indigo-500/20'
+                        : 'text-neutral-500 hover:text-neutral-200 hover:bg-white/[0.05] border border-transparent'
                     }`}
                   >
-                    <Icon size={16} className={active ? 'text-indigo-400' : ''} />
+                    <Icon size={15} className={active ? 'text-indigo-300' : 'text-neutral-600'} />
                     {label}
                     {showApprovalsBadge ? (
                       <span className="ml-auto text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full px-1.5 py-0.5 min-w-[18px] text-center leading-none">

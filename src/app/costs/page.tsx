@@ -148,9 +148,14 @@ export default function CostsPage() {
     <div className="max-w-6xl mx-auto">
       {/* Header */}
       <div className="mb-6 flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-extrabold gradient-text tracking-tight">Token Costs</h1>
-          <p className="text-sm text-neutral-500 mt-1">Usage and spend across all agents — refreshes every 60s</p>
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0">
+            <DollarSign size={18} className="text-emerald-400" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-extrabold gradient-text tracking-tight">Token Costs</h1>
+            <p className="text-xs text-neutral-500 mt-0.5">Usage and spend across all agents — refreshes every 60s</p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           {lastRefresh && (

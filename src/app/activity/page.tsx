@@ -132,13 +132,15 @@ export default function ActivityPage() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-extrabold gradient-text tracking-tight flex items-center gap-2">
-            <Activity size={28} className="text-indigo-400" />
-            Activity Feed
-          </h1>
-          <p className="text-sm text-neutral-500 mt-1">Live stream of agent events</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-indigo-500/15 flex items-center justify-center shrink-0">
+            <Activity size={18} className="text-indigo-400" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-extrabold gradient-text tracking-tight">Activity Feed</h1>
+            <p className="text-xs text-neutral-500 mt-0.5">Live stream of agent events</p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-green-400 pulse-dot" />
@@ -158,11 +160,16 @@ export default function ActivityPage() {
       </div>
 
       {loading ? (
-        <div className="py-20 text-center text-neutral-600 text-sm">Loading...</div>
+        <div className="card py-20 text-center text-neutral-600 text-sm">Loading...</div>
       ) : entries.length === 0 ? (
-        <div className="py-20 text-center">
-          <p className="text-neutral-600 text-sm">No activity yet</p>
-          <p className="text-neutral-700 text-xs mt-1">Events will appear here as agents report them</p>
+        <div className="card py-16 text-center flex flex-col items-center gap-3">
+          <div className="w-12 h-12 rounded-full bg-white/[0.04] flex items-center justify-center">
+            <Activity size={20} className="text-neutral-600" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-neutral-500">No activity yet</p>
+            <p className="text-xs text-neutral-700 mt-1">Events will appear here as agents report them</p>
+          </div>
         </div>
       ) : (
         <div className="space-y-0">

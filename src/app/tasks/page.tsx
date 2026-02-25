@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, GripVertical } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 
 interface Task {
@@ -15,7 +15,7 @@ interface Task {
 }
 
 const COLUMNS = [
-  { id: 'backlog', label: 'Backlog', dot: 'bg-neutral-400', accent: 'col-accent-blue' },
+  { id: 'backlog', label: 'Backlog', dot: 'bg-blue-400', accent: 'col-accent-blue' },
   { id: 'in_progress', label: 'In Progress', dot: 'bg-yellow-400', accent: 'col-accent-yellow' },
   { id: 'done', label: 'Done', dot: 'bg-green-400', accent: 'col-accent-green' },
 ];
@@ -138,23 +138,35 @@ export default function TasksPage() {
 
       {/* Kanban Columns */}
       <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-4 items-start">
           {COLUMNS.map(col => {
             const colTasks = tasks.filter(t => t.status === col.id);
             return (
-              <div key={col.id} className={`card p-4 ${col.accent}`}>
+              <div key={col.id} className={`card p-4 ${col.accent} min-h-[400px] flex flex-col`}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <div className={`w-2.5 h-2.5 rounded-full ${col.dot}`} />
                     <h3 className="text-sm font-semibold text-neutral-300">{col.label}</h3>
+                    <span className="text-[11px] text-neutral-600 bg-white/[0.06] px-1.5 py-0.5 rounded-full font-medium leading-none">{colTasks.length}</span>
                   </div>
-                  <span className="text-xs text-neutral-500 bg-white/[0.06] px-2 py-0.5 rounded-full font-medium">{colTasks.length}</span>
+                  <button
+                    onClick={() => { setEditingTask(null); setForm({ title: '', description: '', assignee: 'me', priority: 'medium', status: col.id }); setShowForm(true); }}
+                    className="w-6 h-6 rounded-md flex items-center justify-center text-neutral-600 hover:text-neutral-300 hover:bg-white/[0.07] transition-all"
+                    title={`Add to ${col.label}`}
+                  >
+                    <Plus size={13} />
+                  </button>
                 </div>
                 <Droppable droppableId={col.id}>
                   {(provided) => (
-                    <div ref={provided.innerRef} {...provided.droppableProps} className="min-h-[60px]">
+                    <div ref={provided.innerRef} {...provided.droppableProps} className="min-h-[280px] flex-1">
                       {colTasks.length === 0 ? (
-                        <p className="text-xs text-neutral-600 text-center py-8">No tasks</p>
+                        <div className="flex flex-col items-center justify-center py-12 gap-2">
+                          <div className="w-8 h-8 rounded-full bg-white/[0.04] flex items-center justify-center">
+                            <div className={`w-2 h-2 rounded-full ${col.dot} opacity-40`} />
+                          </div>
+                          <p className="text-xs text-neutral-600">No tasks</p>
+                        </div>
                       ) : (
                         <div className="space-y-2">
                           {colTasks.map((task, idx) => {

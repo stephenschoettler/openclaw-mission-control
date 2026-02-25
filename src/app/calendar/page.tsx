@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Trash2, Zap } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Trash2, Zap, CalendarDays, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface CalEvent {
   id: number;
@@ -20,6 +20,44 @@ interface CronJob {
   agent?: string;
   enabled?: boolean;
   payload?: { message?: string };
+}
+
+function humanizeCron(expr: string): string {
+  const parts = expr.trim().split(/\s+/);
+  if (parts.length < 5) return expr;
+  const [min, hour, dom, mon, dow] = parts;
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  try {
+    if (dom === '*' && mon === '*' && dow === '*') {
+      if (hour === '*' && min === '*') return 'Every minute';
+      if (hour === '*') return `Every hour at :${min.padStart(2,'0')}`;
+      const h = parseInt(hour); const m = parseInt(min);
+      const time = `${h % 12 || 12}:${String(m).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`;
+      if (min === '0' && hour === '0') return 'Daily at midnight';
+      return `Daily at ${time}`;
+    }
+    if (dow !== '*' && dom === '*' && mon === '*') {
+      const h = parseInt(hour); const m = parseInt(min);
+      const time = `${h % 12 || 12}:${String(m).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`;
+      const dayName = days[parseInt(dow)] || dow;
+      return `${dayName} at ${time}`;
+    }
+    if (dom !== '*' && mon === '*' && dow === '*') {
+      const h = parseInt(hour); const m = parseInt(min);
+      const time = `${h % 12 || 12}:${String(m).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`;
+      return `Day ${dom} at ${time}`;
+    }
+    if (mon !== '*' && dom !== '*') {
+      const h = parseInt(hour); const m = parseInt(min);
+      const time = `${h % 12 || 12}:${String(m).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`;
+      const monthName = months[parseInt(mon) - 1] || mon;
+      return `${monthName} ${dom} at ${time}`;
+    }
+    if (min.startsWith('*/')) return `Every ${min.slice(2)} min`;
+    if (hour.startsWith('*/')) return `Every ${hour.slice(2)} hrs`;
+  } catch { /* fall through */ }
+  return expr;
 }
 
 function parseCronNextDate(schedule: string, year: number, month: number): number[] {
@@ -86,6 +124,7 @@ export default function CalendarPage() {
   const [crons, setCrons] = useState<CronJob[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ title: '', date: '', time: '', notes: '' });
+  const [cronsExpanded, setCronsExpanded] = useState(false);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -141,9 +180,14 @@ export default function CalendarPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-5">
-        <div>
-          <h2 className="text-2xl font-extrabold gradient-text tracking-tight">Calendar</h2>
-          <p className="text-xs text-neutral-500 mt-1">Scheduled tasks & events</p>
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-indigo-500/15 flex items-center justify-center shrink-0">
+            <CalendarDays size={18} className="text-indigo-400" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-extrabold gradient-text tracking-tight">Calendar</h2>
+            <p className="text-xs text-neutral-500 mt-0.5">Scheduled tasks & events</p>
+          </div>
         </div>
         <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-sm font-medium transition-all hover:shadow-lg hover:shadow-indigo-500/20">
           <Plus size={16} /> Add Event
@@ -153,21 +197,50 @@ export default function CalendarPage() {
       {/* Always Running crons */}
       {activeCrons.length > 0 && (
         <div className="card p-4 mb-5">
-          <div className="flex items-center gap-2 mb-3">
-            <Zap size={14} className="text-indigo-400" />
+          <button
+            onClick={() => setCronsExpanded(e => !e)}
+            className="flex items-center gap-2 w-full"
+          >
+            <Zap size={13} className="text-indigo-400" />
             <span className="text-xs font-semibold text-neutral-300">Always Running</span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {activeCrons.map(c => {
-              const scheduleExpr = typeof c.schedule === 'string' ? c.schedule : c.schedule?.expr ?? '';
-              const color = cronColorMap.get(c.id) || CRON_COLORS[0];
-              return (
-                <span key={c.id} className={`text-[11px] px-2.5 py-1 rounded-full ${color.bg} ${color.text} border ${color.border} font-medium`}>
-                  {c.name || c.label || c.id} · {scheduleExpr}
-                </span>
-              );
-            })}
-          </div>
+            <span className="text-[11px] text-neutral-600 bg-white/[0.06] px-1.5 py-0.5 rounded-full ml-1">{activeCrons.length}</span>
+            <div className="ml-auto text-neutral-600 hover:text-neutral-400 transition-colors">
+              {cronsExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </div>
+          </button>
+          {cronsExpanded && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              {activeCrons.map(c => {
+                const scheduleExpr = typeof c.schedule === 'string' ? c.schedule : c.schedule?.expr ?? '';
+                const humanSchedule = humanizeCron(scheduleExpr);
+                const color = cronColorMap.get(c.id) || CRON_COLORS[0];
+                return (
+                  <span key={c.id} className={`text-[11px] px-2.5 py-1 rounded-full ${color.bg} ${color.text} border ${color.border} font-medium`} title={scheduleExpr}>
+                    {c.name || c.label || c.id} · {humanSchedule}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+          {!cronsExpanded && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              {activeCrons.slice(0, 4).map(c => {
+                const scheduleExpr = typeof c.schedule === 'string' ? c.schedule : c.schedule?.expr ?? '';
+                const humanSchedule = humanizeCron(scheduleExpr);
+                const color = cronColorMap.get(c.id) || CRON_COLORS[0];
+                return (
+                  <span key={c.id} className={`text-[11px] px-2.5 py-1 rounded-full ${color.bg} ${color.text} border ${color.border} font-medium`} title={scheduleExpr}>
+                    {c.name || c.label || c.id} · {humanSchedule}
+                  </span>
+                );
+              })}
+              {activeCrons.length > 4 && (
+                <button onClick={() => setCronsExpanded(true)} className="text-[11px] px-2.5 py-1 rounded-full bg-white/[0.04] text-neutral-500 border border-white/[0.06] hover:text-neutral-300 transition-colors">
+                  +{activeCrons.length - 4} more
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -214,7 +287,7 @@ export default function CalendarPage() {
               <div key={day} className={`min-h-[100px] p-2 border-b border-r border-white/[0.04] transition-colors ${isToday ? 'bg-indigo-500/[0.07]' : 'hover:bg-white/[0.02]'}`}>
                 <span className={`text-xs font-semibold inline-flex items-center justify-center ${isToday ? 'text-white bg-indigo-500 w-6 h-6 rounded-full' : 'text-neutral-500'}`}>{day}</span>
                 <div className="mt-1 space-y-0.5">
-                  {dayCrons.map(c => {
+                  {dayCrons.slice(0, 2).map(c => {
                     const color = cronColorMap.get(c.id) || CRON_COLORS[0];
                     return (
                       <div key={c.id} className={`text-[9px] px-1.5 py-0.5 rounded ${color.bg} ${color.text} truncate font-medium`} title={c.name || c.label || c.id}>
@@ -222,6 +295,11 @@ export default function CalendarPage() {
                       </div>
                     );
                   })}
+                  {dayCrons.length > 2 && (
+                    <div className="text-[9px] px-1.5 py-0.5 rounded bg-white/[0.05] text-neutral-500 font-medium">
+                      +{dayCrons.length - 2} more
+                    </div>
+                  )}
                   {dayEvents.map(ev => (
                     <div key={ev.id} className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-300 truncate flex items-center gap-1 group border border-green-500/20">
                       <span className="truncate flex-1">{ev.time && `${ev.time} `}{ev.title}</span>

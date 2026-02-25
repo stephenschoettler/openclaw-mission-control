@@ -73,28 +73,20 @@ export default function ContentPage() {
       <div className="flex items-center justify-between mb-5">
         <div>
           <h2 className="text-2xl font-extrabold gradient-text tracking-tight">Content Pipeline</h2>
-          <p className="text-xs text-neutral-500 mt-1">Ideas → Scripts → Thumbnails → Published</p>
+          <div className="flex items-center gap-3 mt-1">
+            <p className="text-xs text-neutral-500">Ideas → Scripting → Thumbnail → Filming → Published</p>
+            {items.length > 0 && (
+              <span className="text-[11px] text-neutral-500">
+                <span className="text-white font-semibold">{items.length}</span> total
+                {' · '}
+                <span className="text-green-400 font-semibold">{items.filter(i => i.stage === 'published').length}</span> published
+              </span>
+            )}
+          </div>
         </div>
         <button onClick={() => { setEditingItem(null); setForm({ title: '', notes: '', script: '', thumbnail_url: '', stage: 'idea' }); setShowForm(true); }} className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-sm font-medium transition-all hover:shadow-lg hover:shadow-indigo-500/20">
           <Plus size={16} /> Add Content
         </button>
-      </div>
-
-      {/* Stats summary */}
-      <div className="grid grid-cols-5 gap-3 mb-5">
-        {STAGES.map(stage => {
-          const Icon = stage.icon;
-          const count = items.filter(i => i.stage === stage.id).length;
-          return (
-            <div key={stage.id} className="card p-3">
-              <div className="flex items-center gap-2">
-                <Icon size={14} className={stage.color} />
-                <span className={`text-[11px] font-semibold ${stage.color}`}>{stage.label}</span>
-              </div>
-              <p className="text-lg font-bold text-white mt-1">{count}</p>
-            </div>
-          );
-        })}
       </div>
 
       {showForm && (
@@ -119,19 +111,29 @@ export default function ContentPage() {
             const stageItems = items.filter(i => i.stage === stage.id);
             const Icon = stage.icon;
             return (
-              <div key={stage.id} className={`card p-3 ${stage.accent}`}>
+              <div key={stage.id} className={`card p-3 ${stage.accent} min-h-[320px] flex flex-col`}>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <Icon size={13} className={stage.color} />
                     <h3 className={`text-xs font-semibold ${stage.color}`}>{stage.label}</h3>
+                    <span className="text-[10px] text-neutral-600 bg-white/[0.06] px-1.5 py-0.5 rounded-full font-medium leading-none">{stageItems.length}</span>
                   </div>
-                  <span className="text-[10px] text-neutral-500 bg-white/[0.06] px-1.5 py-0.5 rounded-full font-medium">{stageItems.length}</span>
+                  <button
+                    onClick={() => { setEditingItem(null); setForm({ title: '', notes: '', script: '', thumbnail_url: '', stage: stage.id }); setShowForm(true); }}
+                    className="w-5 h-5 rounded flex items-center justify-center text-neutral-700 hover:text-neutral-300 hover:bg-white/[0.07] transition-all"
+                    title={`Add to ${stage.label}`}
+                  >
+                    <Plus size={12} />
+                  </button>
                 </div>
                 <Droppable droppableId={stage.id}>
                   {(provided) => (
-                    <div ref={provided.innerRef} {...provided.droppableProps} className="min-h-[60px]">
+                    <div ref={provided.innerRef} {...provided.droppableProps} className="min-h-[240px]">
                       {stageItems.length === 0 ? (
-                        <p className="text-[10px] text-neutral-600 text-center py-6">No items</p>
+                        <div className="flex flex-col items-center justify-center py-10 gap-1.5">
+                          <div className={`w-1.5 h-1.5 rounded-full ${stage.dotColor} opacity-30`} />
+                          <p className="text-[10px] text-neutral-700">No items</p>
+                        </div>
                       ) : (
                         <div className="space-y-2">
                           {stageItems.map((item, idx) => (

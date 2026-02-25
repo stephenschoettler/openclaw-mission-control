@@ -118,9 +118,14 @@ export default function SessionsPage() {
     <div className="max-w-6xl mx-auto">
       {/* Header */}
       <div className="mb-6 flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-extrabold gradient-text tracking-tight">Active Sessions</h1>
-          <p className="text-sm text-neutral-500 mt-1">Live agent context windows — auto-refreshes every 15s</p>
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-indigo-500/15 flex items-center justify-center shrink-0">
+            <Monitor size={18} className="text-indigo-400" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-extrabold gradient-text tracking-tight">Active Sessions</h1>
+            <p className="text-xs text-neutral-500 mt-0.5">Live agent context windows — auto-refreshes every 15s</p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           {lastRefresh && (
