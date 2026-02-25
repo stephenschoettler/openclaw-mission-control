@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { CheckSquare, CalendarDays, Inbox, Activity, Clock, Users, TrendingUp, AlertCircle } from 'lucide-react';
+import { CheckSquare, CalendarDays, Inbox, Activity, Clock, Users, TrendingUp, AlertCircle, DollarSign, Server } from 'lucide-react';
 
 interface OfficeStation {
   agent_id: string;
@@ -40,6 +40,18 @@ interface CalendarEvent {
 interface Task {
   id: number;
   status: string;
+}
+
+interface GatewayInfo {
+  status: 'online' | 'offline';
+  pid: number | null;
+  uptime: string;
+  memory: string;
+  rss_kb: number;
+  primary_model: string;
+  compaction_mode: string;
+  agents_count: number;
+  skills_count: number;
 }
 
 const EVENT_COLORS: Record<string, string> = {
@@ -89,15 +101,19 @@ export default function CommandCenterPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [hasEvents, setHasEvents] = useState(false);
+  const [gateway, setGateway] = useState<GatewayInfo | null>(null);
+  const [todayCost, setTodayCost] = useState<number | null>(null);
 
   const fetchAll = useCallback(async () => {
     try {
-      const [oRes, aRes, actRes, eRes, tRes] = await Promise.all([
+      const [oRes, aRes, actRes, eRes, tRes, gwRes, costRes] = await Promise.all([
         fetch('/api/office'),
         fetch('/api/approvals?status=pending'),
         fetch('/api/activity'),
         fetch('/api/events').catch(() => null),
         fetch('/api/tasks'),
+        fetch('/api/gateway').catch(() => null),
+        fetch('/api/costs').catch(() => null),
       ]);
 
       if (oRes.ok) setStations(await oRes.json());
@@ -107,6 +123,13 @@ export default function CommandCenterPage() {
         setActivity(actData.slice(0, 5));
       }
       if (tRes.ok) setTasks(await tRes.json());
+      if (gwRes && gwRes.ok) setGateway(await gwRes.json());
+      if (costRes && costRes.ok) {
+        try {
+          const cd: { today: { total: number } } = await costRes.json();
+          setTodayCost(cd?.today?.total ?? null);
+        } catch { /* ignore */ }
+      }
 
       if (eRes && eRes.ok) {
         try {
@@ -148,6 +171,41 @@ export default function CommandCenterPage() {
         <h1 className="text-3xl font-extrabold gradient-text tracking-tight">Command Center</h1>
         <p className="text-sm text-neutral-500 mt-1">Live fleet status — refreshes every 15s</p>
       </div>
+
+      {/* Gateway Health Strip */}
+      {gateway && (
+        <div className={`mb-5 px-4 py-2.5 rounded-xl border flex items-center gap-4 text-[12px] ${
+          gateway.status === 'online'
+            ? 'bg-green-500/5 border-green-500/15'
+            : 'bg-red-500/5 border-red-500/15'
+        }`}>
+          <div className="flex items-center gap-2 shrink-0">
+            <Server size={13} className={gateway.status === 'online' ? 'text-green-400' : 'text-red-400'} />
+            <span className={`font-semibold ${gateway.status === 'online' ? 'text-green-400' : 'text-red-400'}`}>
+              ● Gateway {gateway.status === 'online' ? 'Online' : 'Offline'}
+            </span>
+          </div>
+          {gateway.status === 'online' && (
+            <>
+              {gateway.pid && (
+                <span className="text-neutral-600 font-mono">PID {gateway.pid}</span>
+              )}
+              {gateway.uptime && (
+                <span className="text-neutral-500">Up <span className="text-neutral-300 font-mono">{gateway.uptime}</span></span>
+              )}
+              {gateway.memory && (
+                <span className="text-neutral-500">Mem <span className="text-neutral-300 font-mono">{gateway.memory}</span></span>
+              )}
+              {gateway.primary_model && (
+                <span className="text-neutral-500">Model <span className="text-neutral-300 font-mono text-[11px]">{gateway.primary_model}</span></span>
+              )}
+              {gateway.agents_count > 0 && (
+                <span className="text-neutral-500">{gateway.agents_count} agents</span>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* Active Agents — prominent at top */}
       <section className="mb-6">
@@ -337,7 +395,7 @@ export default function CommandCenterPage() {
       </div>
 
       {/* Bottom: Quick stats */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-5 gap-4">
         <div className="card p-4 shimmer-hover">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-7 h-7 rounded-lg bg-indigo-500/15 flex items-center justify-center">
@@ -383,6 +441,19 @@ export default function CommandCenterPage() {
             <div className="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full transition-all" style={{ width: `${donePercent}%` }} />
           </div>
         </div>
+
+        <Link href="/costs" className="card p-4 shimmer-hover block">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-7 h-7 rounded-lg bg-emerald-500/15 flex items-center justify-center">
+              <DollarSign size={14} className="text-emerald-400" />
+            </div>
+            <span className="text-[11px] text-neutral-500 font-medium">Today&apos;s Cost</span>
+          </div>
+          <p className="text-2xl font-bold text-white">
+            {todayCost !== null ? `$${todayCost.toFixed(2)}` : '—'}
+          </p>
+          <p className="text-[10px] text-neutral-600 mt-0.5">token spend</p>
+        </Link>
       </div>
     </div>
   );
