@@ -133,7 +133,10 @@ async function parseJSONL(filePath: string): Promise<{
         const inp = usage.input || 0;
         const out = usage.output || 0;
         const cr = usage.cacheRead || 0;
-        const tt = usage.totalTokens || 0;
+        // Show input + output only — cacheRead is the same context re-read each
+        // turn and inflates counts massively. Cost is still calculated accurately
+        // from cost.total which reflects actual API billing.
+        const tt = inp + out;
         const costVal = typeof usage.cost === 'object' && usage.cost
           ? (usage.cost.total || 0)
           : inp * INPUT_RATE + out * OUTPUT_RATE;

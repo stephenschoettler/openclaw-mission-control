@@ -174,6 +174,11 @@ export default function CostsPage() {
         </div>
       </div>
 
+      {/* Disclaimer */}
+      <p className="text-xs text-neutral-500 mb-2">
+        ⓘ Estimated at standard API rates (claude-sonnet: $3/M input · $15/M output). Actual charges depend on your plan.
+      </p>
+
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="card p-4 col-span-1">
