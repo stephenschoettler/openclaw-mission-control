@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Trash2, ChevronRight, ChevronLeft, Edit3, Lightbulb, FileText, Image, Video, CheckCircle2 } from 'lucide-react';
+import { Plus, Trash2, Edit3, Lightbulb, FileText, Image, Video, CheckCircle2 } from 'lucide-react';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 
 interface ContentItem {
   id: number;
@@ -33,6 +34,7 @@ export default function ContentPage() {
   }, []);
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
+  useEffect(() => { const id = setInterval(fetchItems, 30000); return () => clearInterval(id); }, [fetchItems]);
 
   const handleSubmit = async () => {
     if (!form.title.trim()) return;
@@ -52,11 +54,11 @@ export default function ContentPage() {
     fetchItems();
   };
 
-  const moveItem = async (item: ContentItem, direction: 'left' | 'right') => {
-    const idx = STAGES.findIndex(s => s.id === item.stage);
-    const newIdx = direction === 'right' ? Math.min(idx + 1, STAGES.length - 1) : Math.max(idx - 1, 0);
-    if (idx === newIdx) return;
-    await fetch('/api/content', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: item.id, stage: STAGES[newIdx].id }) });
+  const handleDragEnd = async (result: DropResult) => {
+    if (!result.destination) return;
+    const { source, destination } = result;
+    if (source.droppableId === destination.droppableId) return;
+    await fetch('/api/content', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: parseInt(result.draggableId), stage: destination.droppableId }) });
     fetchItems();
   };
 
@@ -111,47 +113,61 @@ export default function ContentPage() {
       )}
 
       {/* Pipeline Columns */}
-      <div className="grid grid-cols-5 gap-3">
-        {STAGES.map(stage => {
-          const stageItems = items.filter(i => i.stage === stage.id);
-          const Icon = stage.icon;
-          return (
-            <div key={stage.id} className={`card p-3 ${stage.accent}`}>
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Icon size={13} className={stage.color} />
-                  <h3 className={`text-xs font-semibold ${stage.color}`}>{stage.label}</h3>
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <div className="grid grid-cols-5 gap-3">
+          {STAGES.map(stage => {
+            const stageItems = items.filter(i => i.stage === stage.id);
+            const Icon = stage.icon;
+            return (
+              <div key={stage.id} className={`card p-3 ${stage.accent}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Icon size={13} className={stage.color} />
+                    <h3 className={`text-xs font-semibold ${stage.color}`}>{stage.label}</h3>
+                  </div>
+                  <span className="text-[10px] text-neutral-500 bg-white/[0.06] px-1.5 py-0.5 rounded-full font-medium">{stageItems.length}</span>
                 </div>
-                <span className="text-[10px] text-neutral-500 bg-white/[0.06] px-1.5 py-0.5 rounded-full font-medium">{stageItems.length}</span>
-              </div>
-              {stageItems.length === 0 ? (
-                <p className="text-[10px] text-neutral-600 text-center py-6">No items</p>
-              ) : (
-                <div className="space-y-2">
-                  {stageItems.map(item => (
-                    <div key={item.id} className="p-2.5 bg-white/[0.03] border border-white/[0.06] rounded-lg group hover:border-white/[0.12] hover:bg-white/[0.04] transition-all">
-                      <button onClick={() => startEdit(item)} className="text-xs font-medium text-white hover:text-indigo-400 text-left truncate block w-full transition-colors">
-                        {item.title}
-                      </button>
-                      {item.notes && <p className="text-[10px] text-neutral-500 mt-1 line-clamp-2">{item.notes}</p>}
-                      <div className="flex items-center justify-between mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => moveItem(item, 'left')} className="p-0.5 hover:text-white text-neutral-600 transition-colors"><ChevronLeft size={12} /></button>
-                          <button onClick={() => moveItem(item, 'right')} className="p-0.5 hover:text-white text-neutral-600 transition-colors"><ChevronRight size={12} /></button>
+                <Droppable droppableId={stage.id}>
+                  {(provided) => (
+                    <div ref={provided.innerRef} {...provided.droppableProps} className="min-h-[60px]">
+                      {stageItems.length === 0 ? (
+                        <p className="text-[10px] text-neutral-600 text-center py-6">No items</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {stageItems.map((item, idx) => (
+                            <Draggable key={item.id} draggableId={String(item.id)} index={idx}>
+                              {(provided) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                  className="p-2.5 bg-white/[0.03] border border-white/[0.06] rounded-lg group hover:border-white/[0.12] hover:bg-white/[0.04] transition-all"
+                                >
+                                  <button onClick={() => startEdit(item)} className="text-xs font-medium text-white hover:text-indigo-400 text-left truncate block w-full transition-colors">
+                                    {item.title}
+                                  </button>
+                                  {item.notes && <p className="text-[10px] text-neutral-500 mt-1 line-clamp-2">{item.notes}</p>}
+                                  <div className="flex items-center justify-end mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="flex items-center gap-1">
+                                      <button onClick={() => startEdit(item)} className="p-0.5 hover:text-indigo-400 text-neutral-600 transition-colors"><Edit3 size={12} /></button>
+                                      <button onClick={() => deleteItem(item.id)} className="p-0.5 hover:text-red-400 text-neutral-600 transition-colors"><Trash2 size={12} /></button>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </Draggable>
+                          ))}
                         </div>
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => startEdit(item)} className="p-0.5 hover:text-indigo-400 text-neutral-600 transition-colors"><Edit3 size={12} /></button>
-                          <button onClick={() => deleteItem(item.id)} className="p-0.5 hover:text-red-400 text-neutral-600 transition-colors"><Trash2 size={12} /></button>
-                        </div>
-                      </div>
+                      )}
+                      {provided.placeholder}
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+                  )}
+                </Droppable>
+              </div>
+            );
+          })}
+        </div>
+      </DragDropContext>
     </div>
   );
 }

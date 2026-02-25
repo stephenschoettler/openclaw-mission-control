@@ -69,6 +69,7 @@ export default function OfficePage() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { const id = setInterval(fetchData, 30000); return () => clearInterval(id); }, [fetchData]);
 
   const cycleStatus = async (station: OfficeStation) => {
     const currentIdx = STATUS_CYCLE.indexOf(station.status as typeof STATUS_CYCLE[number]);

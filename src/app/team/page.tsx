@@ -47,6 +47,7 @@ export default function TeamPage() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { const id = setInterval(fetchData, 30000); return () => clearInterval(id); }, [fetchData]);
 
   const models = agents.reduce<Record<string, number>>((acc, a) => {
     const m = a.model || 'unknown';

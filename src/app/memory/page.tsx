@@ -40,6 +40,7 @@ export default function MemoryPage() {
   }, []);
 
   useEffect(() => { fetchFiles(); }, [fetchFiles]);
+  useEffect(() => { const id = setInterval(fetchFiles, 30000); return () => clearInterval(id); }, [fetchFiles]);
 
   const openFile = async (filename: string) => {
     setSelectedFile(filename);

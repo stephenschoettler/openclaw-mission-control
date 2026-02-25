@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Trash2, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 
 interface Task {
   id: number;
@@ -49,6 +50,7 @@ export default function TasksPage() {
   }, []);
 
   useEffect(() => { fetchTasks(); }, [fetchTasks]);
+  useEffect(() => { const id = setInterval(fetchTasks, 30000); return () => clearInterval(id); }, [fetchTasks]);
 
   const handleSubmit = async () => {
     if (!form.title.trim()) return;
@@ -68,11 +70,11 @@ export default function TasksPage() {
     fetchTasks();
   };
 
-  const moveTask = async (task: Task, direction: 'left' | 'right') => {
-    const idx = COLUMNS.findIndex(c => c.id === task.status);
-    const newIdx = direction === 'right' ? Math.min(idx + 1, COLUMNS.length - 1) : Math.max(idx - 1, 0);
-    if (idx === newIdx) return;
-    await fetch('/api/tasks', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: task.id, status: COLUMNS[newIdx].id }) });
+  const handleDragEnd = async (result: DropResult) => {
+    if (!result.destination) return;
+    const { source, destination } = result;
+    if (source.droppableId === destination.droppableId) return;
+    await fetch('/api/tasks', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: parseInt(result.draggableId), status: destination.droppableId }) });
     fetchTasks();
   };
 
@@ -135,53 +137,69 @@ export default function TasksPage() {
       )}
 
       {/* Kanban Columns */}
-      <div className="grid grid-cols-3 gap-4">
-        {COLUMNS.map(col => {
-          const colTasks = tasks.filter(t => t.status === col.id);
-          return (
-            <div key={col.id} className={`card p-4 ${col.accent}`}>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <div className={`w-2.5 h-2.5 rounded-full ${col.dot}`} />
-                  <h3 className="text-sm font-semibold text-neutral-300">{col.label}</h3>
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <div className="grid grid-cols-3 gap-4">
+          {COLUMNS.map(col => {
+            const colTasks = tasks.filter(t => t.status === col.id);
+            return (
+              <div key={col.id} className={`card p-4 ${col.accent}`}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2.5 h-2.5 rounded-full ${col.dot}`} />
+                    <h3 className="text-sm font-semibold text-neutral-300">{col.label}</h3>
+                  </div>
+                  <span className="text-xs text-neutral-500 bg-white/[0.06] px-2 py-0.5 rounded-full font-medium">{colTasks.length}</span>
                 </div>
-                <span className="text-xs text-neutral-500 bg-white/[0.06] px-2 py-0.5 rounded-full font-medium">{colTasks.length}</span>
+                <Droppable droppableId={col.id}>
+                  {(provided) => (
+                    <div ref={provided.innerRef} {...provided.droppableProps} className="min-h-[60px]">
+                      {colTasks.length === 0 ? (
+                        <p className="text-xs text-neutral-600 text-center py-8">No tasks</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {colTasks.map((task, idx) => {
+                            const pCfg = priorityConfig[task.priority] || priorityConfig.medium;
+                            return (
+                              <Draggable key={task.id} draggableId={String(task.id)} index={idx}>
+                                {(provided) => (
+                                  <div
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    {...provided.dragHandleProps}
+                                    className={`p-3 bg-white/[0.03] border border-white/[0.06] border-l-2 ${pCfg.border} rounded-lg group hover:border-white/[0.12] hover:bg-white/[0.04] transition-all`}
+                                  >
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="flex-1 min-w-0">
+                                        <button onClick={() => startEdit(task)} className="text-sm font-medium text-white hover:text-indigo-400 text-left truncate block w-full transition-colors">{task.title}</button>
+                                        {task.description && <p className="text-xs text-neutral-500 mt-1 line-clamp-2">{task.description}</p>}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center justify-between mt-2.5">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-[10px] bg-white/[0.06] text-neutral-400 px-1.5 py-0.5 rounded font-medium">{task.assignee}</span>
+                                        <span className={`text-[10px] font-semibold ${pCfg.color}`}>{task.priority}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onClick={() => deleteTask(task.id)} className="p-0.5 hover:text-red-400 text-neutral-600 transition-colors" title="Delete"><Trash2 size={14} /></button>
+                                      </div>
+                                    </div>
+                                    <p className="text-[10px] text-neutral-600 mt-1.5">{timeAgo(task.created_at)}</p>
+                                  </div>
+                                )}
+                              </Draggable>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
               </div>
-              {colTasks.length === 0 ? (
-                <p className="text-xs text-neutral-600 text-center py-8">No tasks</p>
-              ) : (
-                <div className="space-y-2">
-                  {colTasks.map(task => {
-                    const pCfg = priorityConfig[task.priority] || priorityConfig.medium;
-                    return (
-                      <div key={task.id} className={`p-3 bg-white/[0.03] border border-white/[0.06] border-l-2 ${pCfg.border} rounded-lg group hover:border-white/[0.12] hover:bg-white/[0.04] transition-all`}>
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <button onClick={() => startEdit(task)} className="text-sm font-medium text-white hover:text-indigo-400 text-left truncate block w-full transition-colors">{task.title}</button>
-                            {task.description && <p className="text-xs text-neutral-500 mt-1 line-clamp-2">{task.description}</p>}
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between mt-2.5">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] bg-white/[0.06] text-neutral-400 px-1.5 py-0.5 rounded font-medium">{task.assignee}</span>
-                            <span className={`text-[10px] font-semibold ${pCfg.color}`}>{task.priority}</span>
-                          </div>
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => moveTask(task, 'left')} className="p-0.5 hover:text-white text-neutral-600 transition-colors" title="Move left"><ChevronLeft size={14} /></button>
-                            <button onClick={() => moveTask(task, 'right')} className="p-0.5 hover:text-white text-neutral-600 transition-colors" title="Move right"><ChevronRight size={14} /></button>
-                            <button onClick={() => deleteTask(task.id)} className="p-0.5 hover:text-red-400 text-neutral-600 transition-colors" title="Delete"><Trash2 size={14} /></button>
-                          </div>
-                        </div>
-                        <p className="text-[10px] text-neutral-600 mt-1.5">{timeAgo(task.created_at)}</p>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      </DragDropContext>
     </div>
   );
 }

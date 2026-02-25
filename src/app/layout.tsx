@@ -3,17 +3,30 @@
 import "./globals.css";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, CheckSquare, CalendarDays, Brain, Users, Film, Building2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { LayoutDashboard, CheckSquare, CalendarDays, Brain, Users, Film, Building2, Zap } from "lucide-react";
 
 const navItems = [
   { href: '/', label: 'Overview', icon: LayoutDashboard, exact: true },
   { href: '/tasks', label: 'Tasks', icon: CheckSquare },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays },
+  { href: '/crons', label: 'Crons', icon: Zap },
   { href: '/memory', label: 'Memory', icon: Brain },
   { href: '/team', label: 'Team', icon: Users },
   { href: '/content', label: 'Content', icon: Film },
   { href: '/office', label: 'Office', icon: Building2 },
 ];
+
+function LiveClock() {
+  const [time, setTime] = useState('');
+  useEffect(() => {
+    const tick = () => setTime(new Date().toLocaleTimeString('en-US', { hour12: false }));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
+  return <p className="text-[11px] text-neutral-400 font-mono pl-4 mb-1">{time}</p>;
+}
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -63,6 +76,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               })}
             </nav>
             <div className="p-4 border-t border-white/[0.06]">
+              <LiveClock />
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-green-400 pulse-dot" />
                 <p className="text-[11px] text-neutral-400">System Online</p>

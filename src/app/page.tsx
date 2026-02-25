@@ -55,6 +55,7 @@ export default function OverviewPage() {
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => { const id = setInterval(fetchAll, 30000); return () => clearInterval(id); }, [fetchAll]);
 
   const tasksByStatus = {
     backlog: tasks.filter(t => t.status === 'backlog').length,
@@ -138,7 +139,7 @@ export default function OverviewPage() {
             <p className="text-xs text-neutral-600 py-4 text-center">No agents online</p>
           ) : (
             <div className="space-y-2.5">
-              {stations.map(s => (
+              {[...stations].sort((a,b) => a.status==='working'?-1:b.status==='working'?1:0).slice(0,6).map(s => (
                 <div key={s.agent_id} className="flex items-center gap-3 p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.04]">
                   <div className="relative">
                     <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs">
@@ -159,6 +160,7 @@ export default function OverviewPage() {
                   </span>
                 </div>
               ))}
+              {stations.length > 6 && <p className="text-[10px] text-neutral-600 text-center mt-2">+{stations.length - 6} more · <a href="/office" className="hover:text-neutral-400 transition-colors">view all</a></p>}
             </div>
           )}
         </div>

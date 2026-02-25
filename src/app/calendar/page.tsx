@@ -97,6 +97,7 @@ export default function CalendarPage() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { const id = setInterval(fetchData, 30000); return () => clearInterval(id); }, [fetchData]);
 
   const addEvent = async () => {
     if (!form.title.trim() || !form.date) return;
