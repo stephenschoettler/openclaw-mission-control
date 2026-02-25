@@ -17,15 +17,25 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   const body = await req.json();
-  const { id, ...fields } = body;
-  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
+  const { id, title_match, ...fields } = body;
+
+  // Support lookup by title (for agents that don't store task IDs)
+  let resolvedId = id;
+  if (!resolvedId && title_match) {
+    const found = db.prepare(
+      `SELECT id FROM tasks WHERE title LIKE ? ORDER BY created_at DESC LIMIT 1`
+    ).get(`%${title_match}%`) as { id: number } | undefined;
+    if (found) resolvedId = found.id;
+  }
+
+  if (!resolvedId) return NextResponse.json({ error: 'id or title_match required' }, { status: 400 });
 
   const sets = Object.keys(fields).map(k => `${k} = ?`).join(', ');
   const vals = Object.values(fields);
   if (sets) {
-    db.prepare(`UPDATE tasks SET ${sets}, updated_at = datetime('now') WHERE id = ?`).run(...vals, id);
+    db.prepare(`UPDATE tasks SET ${sets}, updated_at = datetime('now') WHERE id = ?`).run(...vals, resolvedId);
   }
-  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(resolvedId);
   return NextResponse.json(task);
 }
 
