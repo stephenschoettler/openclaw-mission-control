@@ -16,7 +16,7 @@ interface Task {
 
 const COLUMNS = [
   { id: 'backlog', label: 'Backlog', dot: 'bg-blue-400', accent: 'col-accent-blue' },
-  { id: 'in_progress', label: 'In Progress', dot: 'bg-yellow-400', accent: 'col-accent-yellow' },
+  { id: 'in-progress', label: 'In Progress', dot: 'bg-yellow-400', accent: 'col-accent-yellow' },
   { id: 'done', label: 'Done', dot: 'bg-green-400', accent: 'col-accent-green' },
 ];
 
@@ -84,7 +84,7 @@ export default function TasksPage() {
     setShowForm(true);
   };
 
-  const inProgress = tasks.filter(t => t.status === 'in_progress').length;
+  const inProgress = tasks.filter(t => t.status === 'in-progress').length;
   const done = tasks.filter(t => t.status === 'done').length;
   const completion = tasks.length > 0 ? Math.round((done / tasks.length) * 100) : 0;
 

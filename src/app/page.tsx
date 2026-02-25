@@ -158,7 +158,7 @@ export default function CommandCenterPage() {
   const workingAgents = stations.filter(s => s.status === 'working');
   const taskCounts = {
     todo: tasks.filter(t => t.status === 'backlog').length,
-    inProgress: tasks.filter(t => t.status === 'in_progress').length,
+    inProgress: tasks.filter(t => t.status === 'in-progress').length,
     done: tasks.filter(t => t.status === 'done').length,
   };
   const totalTasks = tasks.length;
