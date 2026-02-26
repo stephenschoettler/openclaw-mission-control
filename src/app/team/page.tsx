@@ -193,7 +193,7 @@ function ExpandableManagerCard({
   const opacity = !isWorking && !isIdle ? 'opacity-50 grayscale' : isIdle ? 'opacity-75' : '';
 
   return (
-    <div className={`flex flex-col rounded-2xl border bg-[#252528] transition-all duration-300 ${baseBorder} ${opacity}`}>
+    <div className={`flex flex-col rounded-2xl border bg-[#252528] overflow-hidden transition-all duration-300 ${baseBorder} ${opacity}`}>
       {/* Clickable header */}
       <div
         className="flex flex-col gap-3 p-4 cursor-pointer select-none hover:bg-white/[0.02] transition-colors duration-200 rounded-2xl"
@@ -217,7 +217,7 @@ function ExpandableManagerCard({
           </div>
 
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-white/90 truncate">{agent.name}</p>
+            <p className="text-sm font-bold text-white/90 leading-tight">{agent.name}</p>
             <p className="text-[11px] text-neutral-500 mt-0.5 leading-tight truncate">{agent.title}</p>
           </div>
 
@@ -255,8 +255,9 @@ function ExpandableManagerCard({
 
       {/* Sub-team panel */}
       <div
+        className="border-t border-white/[0.06]"
         style={{
-          maxHeight: expanded ? `${subAgents.length * 130 + 80}px` : '0px',
+          maxHeight: expanded ? '2000px' : '0px',
           opacity: expanded ? 1 : 0,
           overflow: 'hidden',
           transition: 'max-height 0.4s ease-in-out, opacity 0.3s ease-in-out',
