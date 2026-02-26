@@ -238,7 +238,7 @@ export default function CommandCenterPage() {
               </span>
             )}
           </h2>
-          <Link href="/office" className="text-[11px] text-neutral-500 hover:text-indigo-400 transition-colors">View Office →</Link>
+          <Link href="/team" className="text-[11px] text-neutral-500 hover:text-indigo-400 transition-colors">View Team →</Link>
         </div>
 
         {workingAgents.length === 0 ? (

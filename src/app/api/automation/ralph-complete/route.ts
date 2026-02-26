@@ -34,26 +34,43 @@ export async function GET() {
 
   // ── 1. Ralph completed a review ─────────────────────────────────────────────
   const ralphEnd = db.prepare(`
-    SELECT id FROM activity_feed
+    SELECT id, title FROM activity_feed
     WHERE agent_id = 'ralph'
       AND event_type = 'task_end'
       AND id > ?
     ORDER BY id DESC
     LIMIT 1
-  `).get(lastRalphId) as { id: number } | undefined;
+  `).get(lastRalphId) as { id: number; title: string } | undefined;
 
   if (ralphEnd) {
     setState('last_processed_ralph_id', ralphEnd.id);
 
-    // Move all tasks in 'review' → 'done'
-    const updated = db.prepare(`
-      UPDATE tasks
-      SET status = 'done', updated_at = datetime('now')
-      WHERE status = 'review'
-    `).run();
+    // Check if Ralph rejected or approved
+    const isRejected = ralphEnd.title.includes('REJECTED') || ralphEnd.title.includes('❌');
+
+    let updated;
+    if (isRejected) {
+      // Move all tasks in 'review' → 'in-progress'
+      updated = db.prepare(`
+        UPDATE tasks
+        SET status = 'in-progress', updated_at = datetime('now')
+        WHERE status = 'review'
+      `).run();
+    } else {
+      // Move all tasks in 'review' → 'done'
+      updated = db.prepare(`
+        UPDATE tasks
+        SET status = 'done', updated_at = datetime('now')
+        WHERE status = 'review'
+      `).run();
+    }
 
     if (updated.changes > 0) {
-      results.push(`Moved ${updated.changes} review task(s) to done`);
+      if (isRejected) {
+        results.push(`Ralph REJECTED: moved ${updated.changes} review task(s) back to in-progress`);
+      } else {
+        results.push(`Moved ${updated.changes} review task(s) to done`);
+      }
 
       // Append to daily memory file
       try {
@@ -61,7 +78,10 @@ export async function GET() {
         const memDir = '/home/w0lf/.openclaw/workspace/memory';
         const memPath = `${memDir}/${date}.md`;
         fs.mkdirSync(memDir, { recursive: true });
-        fs.appendFileSync(memPath, `\n- ✅ Ralph approved: ${updated.changes} task(s) moved to done (${date})\n`, 'utf8');
+        const memEntry = isRejected
+          ? `\n- ❌ Ralph rejected: ${updated.changes} task(s) moved back to in-progress (${date})\n`
+          : `\n- ✅ Ralph approved: ${updated.changes} task(s) moved to done (${date})\n`;
+        fs.appendFileSync(memPath, memEntry, 'utf8');
       } catch { /* never block */ }
     }
 
