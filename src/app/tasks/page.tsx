@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Trash2, GripVertical } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 
 interface Task {
@@ -15,12 +15,16 @@ interface Task {
 }
 
 const COLUMNS = [
+  { id: 'recurring', label: 'Recurring', dot: 'bg-purple-400', accent: 'col-accent-purple' },
   { id: 'backlog', label: 'Backlog', dot: 'bg-blue-400', accent: 'col-accent-blue' },
   { id: 'in-progress', label: 'In Progress', dot: 'bg-yellow-400', accent: 'col-accent-yellow' },
+  { id: 'review', label: 'Review', dot: 'bg-orange-400', accent: 'col-accent-orange' },
   { id: 'done', label: 'Done', dot: 'bg-green-400', accent: 'col-accent-green' },
 ];
 
-const ASSIGNEES = ['me', 'Babbage', 'Hustle', 'Code Monkey', 'Roadie', 'TLDR', 'Answring Ops'];
+const FILTER_TABS = ['All', 'Sir', 'Babbage'];
+
+const ASSIGNEES = ['me', 'Sir', 'Babbage', 'Hustle', 'Code Monkey', 'Roadie', 'TLDR', 'Answring Ops'];
 const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
 
 const priorityConfig: Record<string, { color: string; border: string }> = {
@@ -31,9 +35,6 @@ const priorityConfig: Record<string, { color: string; border: string }> = {
 };
 
 function parseUtc(dateStr: string): Date {
-  // SQLite stores timestamps as "YYYY-MM-DD HH:MM:SS" (UTC, no timezone suffix).
-  // Appending 'Z' (or replacing the space with 'T' + 'Z') forces UTC interpretation
-  // so that machines in non-UTC timezones don't show future/past offsets.
   const iso = dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T') + 'Z';
   return new Date(iso);
 }
@@ -46,19 +47,29 @@ function timeAgo(dateStr: string): string {
   return `${days} days ago`;
 }
 
+function formatLastUpdated(date: Date): string {
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [form, setForm] = useState({ title: '', description: '', assignee: 'me', priority: 'medium', status: 'backlog' });
+  const [activeFilter, setActiveFilter] = useState('All');
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const fetchTasks = useCallback(async () => {
     const res = await fetch('/api/tasks');
     setTasks(await res.json());
+    setLastUpdated(new Date());
   }, []);
 
   useEffect(() => { fetchTasks(); }, [fetchTasks]);
-  useEffect(() => { const id = setInterval(fetchTasks, 30000); return () => clearInterval(id); }, [fetchTasks]);
+  useEffect(() => {
+    const id = setInterval(fetchTasks, 15000);
+    return () => clearInterval(id);
+  }, [fetchTasks]);
 
   const handleSubmit = async () => {
     if (!form.title.trim()) return;
@@ -92,6 +103,8 @@ export default function TasksPage() {
     setShowForm(true);
   };
 
+  const filteredTasks = activeFilter === 'All' ? tasks : tasks.filter(t => t.assignee === activeFilter);
+
   const inProgress = tasks.filter(t => t.status === 'in-progress').length;
   const done = tasks.filter(t => t.status === 'done').length;
   const completion = tasks.length > 0 ? Math.round((done / tasks.length) * 100) : 0;
@@ -102,6 +115,9 @@ export default function TasksPage() {
       <div className="flex items-center justify-between mb-5">
         <div>
           <h2 className="text-2xl font-extrabold gradient-text tracking-tight">Tasks Board</h2>
+          {lastUpdated && (
+            <p className="text-[11px] text-neutral-600 mt-0.5">Updated {formatLastUpdated(lastUpdated)}</p>
+          )}
         </div>
         <button onClick={() => { setEditingTask(null); setForm({ title: '', description: '', assignee: 'me', priority: 'medium', status: 'backlog' }); setShowForm(true); }} className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-sm font-medium transition-all hover:shadow-lg hover:shadow-indigo-500/20">
           <Plus size={16} /> New task
@@ -109,7 +125,7 @@ export default function TasksPage() {
       </div>
 
       {/* Stats Bar */}
-      <div className="flex items-center gap-6 mb-5 px-1">
+      <div className="flex items-center gap-6 mb-4 px-1">
         <div className="flex items-baseline gap-1.5">
           <span className="text-xl font-bold text-white">{inProgress}</span>
           <span className="text-xs text-neutral-500">In progress</span>
@@ -124,6 +140,23 @@ export default function TasksPage() {
         </div>
       </div>
 
+      {/* Assignee Filter Tabs */}
+      <div className="flex items-center gap-1 mb-5">
+        {FILTER_TABS.map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveFilter(tab)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              activeFilter === tab
+                ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                : 'text-neutral-500 hover:text-neutral-300 hover:bg-white/[0.05]'
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
       {/* Add/Edit Form */}
       {showForm && (
         <div className="mb-6 p-4 card">
@@ -136,6 +169,9 @@ export default function TasksPage() {
             <select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })} className="px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white outline-none">
               {PRIORITIES.map(p => <option key={p} value={p} className="bg-neutral-900">{p}</option>)}
             </select>
+            <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="col-span-2 px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white outline-none">
+              {COLUMNS.map(c => <option key={c.id} value={c.id} className="bg-neutral-900">{c.label}</option>)}
+            </select>
           </div>
           <div className="flex gap-2">
             <button onClick={handleSubmit} className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-sm font-medium">{editingTask ? 'Update' : 'Create'}</button>
@@ -146,11 +182,11 @@ export default function TasksPage() {
 
       {/* Kanban Columns */}
       <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-3 gap-4 items-start">
+        <div className="grid gap-4 items-start" style={{ gridTemplateColumns: `repeat(${COLUMNS.length}, minmax(0, 1fr))` }}>
           {COLUMNS.map(col => {
-            const colTasks = tasks.filter(t => t.status === col.id);
+            const colTasks = filteredTasks.filter(t => t.status === col.id);
             return (
-              <div key={col.id} className={`card p-4 ${col.accent} min-h-[400px] flex flex-col`}>
+              <div key={col.id} className={`card p-4 min-h-[400px] flex flex-col`}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <div className={`w-2.5 h-2.5 rounded-full ${col.dot}`} />

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Trash2, Zap, CalendarDays, ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Trash2, Zap, CalendarDays, ChevronDown, ChevronUp, Clock } from 'lucide-react';
+import { CronExpressionParser } from 'cron-parser';
 
 interface CalEvent {
   id: number;
@@ -110,6 +111,27 @@ function expandCronField(field: string, min: number, max: number): number[] {
   return result;
 }
 
+function getNextRun(schedule: string, tz?: string): Date | null {
+  try {
+    const options: Record<string, unknown> = tz ? { tz } : {};
+    const interval = CronExpressionParser.parse(schedule, options);
+    return interval.next().toDate();
+  } catch {
+    return null;
+  }
+}
+
+function timeUntil(date: Date): string {
+  const diff = date.getTime() - Date.now();
+  if (diff < 0) return 'overdue';
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `in ${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `in ${hrs} hr${hrs !== 1 ? 's' : ''}`;
+  const days = Math.floor(hrs / 24);
+  return `in ${days} day${days !== 1 ? 's' : ''}`;
+}
+
 const CRON_COLORS = [
   { bg: 'bg-indigo-500/20', text: 'text-indigo-300', border: 'border-indigo-500/30' },
   { bg: 'bg-purple-500/20', text: 'text-purple-300', border: 'border-purple-500/30' },
@@ -174,6 +196,18 @@ export default function CalendarPage() {
   // Assign stable colors to cron jobs
   const cronColorMap = new Map<string, typeof CRON_COLORS[0]>();
   activeCrons.forEach((c, i) => cronColorMap.set(c.id, CRON_COLORS[i % CRON_COLORS.length]));
+
+  // Compute "Next Up" — next 5 soonest cron runs
+  const nextUpItems = activeCrons
+    .map(c => {
+      const expr = typeof c.schedule === 'string' ? c.schedule : c.schedule?.expr ?? '';
+      const tz = typeof c.schedule === 'object' ? c.schedule?.tz : undefined;
+      const next = getNextRun(expr, tz);
+      return next ? { cron: c, next } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => a!.next.getTime() - b!.next.getTime())
+    .slice(0, 5) as { cron: CronJob; next: Date }[];
 
   const monthStr = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
 
@@ -312,6 +346,37 @@ export default function CalendarPage() {
           })}
         </div>
       </div>
+      {/* Next Up panel */}
+      {nextUpItems.length > 0 && (
+        <div className="card p-4 mt-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Clock size={14} className="text-indigo-400" />
+            <span className="text-xs font-semibold text-neutral-300">Next Up</span>
+            <span className="text-[11px] text-neutral-600 bg-white/[0.06] px-1.5 py-0.5 rounded-full">{nextUpItems.length}</span>
+          </div>
+          <div className="space-y-2">
+            {nextUpItems.map(({ cron, next }) => {
+              const color = cronColorMap.get(cron.id) || CRON_COLORS[0];
+              const label = cron.name || cron.label || cron.id;
+              const agent = cron.agentId || cron.agent || '—';
+              return (
+                <div key={cron.id} className="flex items-center justify-between py-2 border-b border-white/[0.04] last:border-0">
+                  <div className="flex items-center gap-3">
+                    <span className={`w-2 h-2 rounded-full ${color.bg.replace('/20', '')} flex-shrink-0`} style={{ background: 'currentColor' }} />
+                    <div>
+                      <span className={`text-xs font-medium ${color.text}`}>{label}</span>
+                      <span className="text-[11px] text-neutral-600 ml-2">{agent}</span>
+                    </div>
+                  </div>
+                  <span className="text-[11px] text-neutral-400 font-mono bg-white/[0.04] px-2 py-0.5 rounded">
+                    {timeUntil(next)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
