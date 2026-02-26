@@ -186,8 +186,8 @@ export default function TasksPage() {
           {COLUMNS.map(col => {
             const colTasks = filteredTasks.filter(t => t.status === col.id);
             return (
-              <div key={col.id} className={`card p-4 min-h-[400px] flex flex-col`}>
-                <div className="flex items-center justify-between mb-4">
+              <div key={col.id} className={`card p-4 flex flex-col`} style={{ height: 'calc(100vh - 280px)', minHeight: '400px', maxHeight: '800px' }}>
+                <div className="flex items-center justify-between mb-4 flex-shrink-0">
                   <div className="flex items-center gap-2">
                     <div className={`w-2.5 h-2.5 rounded-full ${col.dot}`} />
                     <h3 className="text-sm font-semibold text-neutral-300">{col.label}</h3>
@@ -203,7 +203,7 @@ export default function TasksPage() {
                 </div>
                 <Droppable droppableId={col.id}>
                   {(provided) => (
-                    <div ref={provided.innerRef} {...provided.droppableProps} className="min-h-[280px] flex-1">
+                    <div ref={provided.innerRef} {...provided.droppableProps} className="flex-1 overflow-y-auto min-h-0 pr-0.5">
                       {colTasks.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-12 gap-2">
                           <div className="w-8 h-8 rounded-full bg-white/[0.04] flex items-center justify-center">
