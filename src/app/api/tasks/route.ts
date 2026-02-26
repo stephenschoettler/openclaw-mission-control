@@ -37,6 +37,27 @@ export async function PATCH(req: NextRequest) {
   }
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(resolvedId) as { title: string; assignee: string; status: string } | undefined;
 
+  // Fire-and-forget: auto-spawn Ralph when task moves to review
+  if (fields.status === 'review' && task) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { spawn } = require('child_process');
+      const ralphTask = `QA review of recently completed work on task: "${task.title}". Check the latest git commit in ~/mission-control for what changed. title_match: "${task.title}". Return APPROVED ✅ or REJECTED ❌.`;
+      const proc = spawn(
+        'node',
+        [
+          '/home/w0lf/dev/openclaw/openclaw.mjs',
+          'agent',
+          '--agent', 'ralph',
+          '--message', ralphTask,
+          '--deliver',
+        ],
+        { detached: true, stdio: 'ignore' }
+      );
+      proc.unref();
+    } catch { /* never block the response */ }
+  }
+
   // Fire-and-forget: append to today's memory file
   if (fields.status === 'done' && task) {
     try {
