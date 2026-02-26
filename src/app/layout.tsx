@@ -181,6 +181,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     return () => clearInterval(id);
   }, []);
 
+  // Sync agent status from live OpenClaw sessions every 15s
+  useEffect(() => {
+    const syncSessions = () => {
+      fetch('/api/sync-sessions', { method: 'POST' }).catch(() => {/* silent */});
+    };
+    syncSessions();
+    const id = setInterval(syncSessions, 15000);
+    return () => clearInterval(id);
+  }, []);
+
   // Mark activity as seen when navigating to /activity
   useEffect(() => {
     if (pathname === '/activity') {
