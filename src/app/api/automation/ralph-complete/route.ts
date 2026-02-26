@@ -9,15 +9,28 @@ import db from '@/lib/db';
  * - If Ralph posted task_end since last check → move all 'review' tasks to 'done', clear ralph + code-monkey to idle
  * - If code-monkey posted task_end since last check → clear code-monkey to idle
  *
- * Uses module-level state to track the last processed activity IDs so a single
- * event is never processed twice (avoids the 30s window + 15s poll overlap).
+ * Uses DB-backed automation_state to track last processed activity IDs so a
+ * single event is never processed twice across restarts or concurrent requests.
  */
 
-let lastProcessedRalphId = 0;
-let lastProcessedMonkeyId = 0;
+function getState(key: string): number {
+  const row = db.prepare('SELECT value FROM automation_state WHERE key = ?').get(key) as { value: string } | undefined;
+  return row ? parseInt(row.value, 10) : 0;
+}
+
+function setState(key: string, value: number) {
+  db.prepare(`
+    INSERT INTO automation_state (key, value, updated_at)
+    VALUES (?, ?, datetime('now'))
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
+  `).run(key, String(value));
+}
 
 export async function GET() {
   const results: string[] = [];
+
+  const lastRalphId = getState('last_processed_ralph_id');
+  const lastMonkeyId = getState('last_processed_monkey_id');
 
   // ── 1. Ralph completed a review ─────────────────────────────────────────────
   const ralphEnd = db.prepare(`
@@ -27,10 +40,10 @@ export async function GET() {
       AND id > ?
     ORDER BY id DESC
     LIMIT 1
-  `).get(lastProcessedRalphId) as { id: number } | undefined;
+  `).get(lastRalphId) as { id: number } | undefined;
 
   if (ralphEnd) {
-    lastProcessedRalphId = ralphEnd.id;
+    setState('last_processed_ralph_id', ralphEnd.id);
 
     // Move all tasks in 'review' → 'done'
     const updated = db.prepare(`
@@ -42,7 +55,7 @@ export async function GET() {
     if (updated.changes > 0) {
       results.push(`Moved ${updated.changes} review task(s) to done`);
 
-      // Append completed tasks to memory
+      // Append to daily memory file
       try {
         const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date());
         const memDir = '/home/w0lf/.openclaw/workspace/memory';
@@ -84,10 +97,10 @@ export async function GET() {
         AND id > ?
       ORDER BY id DESC
       LIMIT 1
-    `).get(lastProcessedMonkeyId) as { id: number } | undefined;
+    `).get(lastMonkeyId) as { id: number } | undefined;
 
     if (monkeyEnd) {
-      lastProcessedMonkeyId = monkeyEnd.id;
+      setState('last_processed_monkey_id', monkeyEnd.id);
 
       db.prepare(`
         INSERT INTO office_status (agent_id, agent_name, role, current_task, status)
