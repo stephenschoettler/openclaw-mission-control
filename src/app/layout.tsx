@@ -6,20 +6,40 @@ import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { LayoutDashboard, CheckSquare, CalendarDays, FolderOpen, Users, Film, Zap, Inbox, Activity, Send, Monitor, DollarSign, LogOut, Puzzle, BarChart2 } from "lucide-react";
 
-const navItems = [
-  { href: '/', label: 'Overview', icon: LayoutDashboard, exact: true },
-  { href: '/tasks', label: 'Tasks', icon: CheckSquare },
-  { href: '/analytics', label: 'Analytics', icon: BarChart2 },
-  { href: '/calendar', label: 'Calendar', icon: CalendarDays },
-  { href: '/sessions', label: 'Sessions', icon: Monitor },
-  { href: '/crons', label: 'Crons', icon: Zap },
-  { href: '/costs', label: 'Costs', icon: DollarSign },
-  { href: '/approvals', label: 'Approvals', icon: Inbox },
-  { href: '/files', label: 'Files', icon: FolderOpen },
-  { href: '/team', label: 'Team', icon: Users },
-  { href: '/activity', label: 'Activity', icon: Activity },
-  { href: '/content', label: 'Content', icon: Film },
-  { href: '/skills', label: 'Skills', icon: Puzzle },
+const navGroups = [
+  {
+    label: 'Fleet',
+    items: [
+      { href: '/', label: 'Overview', icon: LayoutDashboard, exact: true },
+      { href: '/team', label: 'Team', icon: Users },
+      { href: '/activity', label: 'Activity', icon: Activity },
+    ],
+  },
+  {
+    label: 'Work',
+    items: [
+      { href: '/tasks', label: 'Tasks', icon: CheckSquare },
+      { href: '/analytics', label: 'Analytics', icon: BarChart2 },
+      { href: '/approvals', label: 'Approvals', icon: Inbox },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
+      { href: '/sessions', label: 'Sessions', icon: Monitor },
+      { href: '/crons', label: 'Crons', icon: Zap },
+      { href: '/costs', label: 'Costs', icon: DollarSign },
+      { href: '/calendar', label: 'Calendar', icon: CalendarDays },
+    ],
+  },
+  {
+    label: 'Content',
+    items: [
+      { href: '/content', label: 'Content', icon: Film },
+      { href: '/files', label: 'Files', icon: FolderOpen },
+      { href: '/skills', label: 'Skills', icon: Puzzle },
+    ],
+  },
 ];
 
 function LiveClock() {
@@ -237,37 +257,44 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </div>
               </div>
             </Link>
-            <nav className="flex-1 px-3 space-y-0.5 mt-1 overflow-y-auto">
-              {navItems.map(({ href, label, icon: Icon, exact }) => {
-                const active = exact ? pathname === href : pathname.startsWith(href);
-                const isApprovals = href === '/approvals';
-                const isActivity = href === '/activity';
-                const showApprovalsBadge = isApprovals && pendingApprovals > 0;
-                const showActivityDot = isActivity && hasNewActivity;
-                return (
-                  <Link
-                    key={href}
-                    href={href}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-150 ${
-                      active
-                        ? 'bg-indigo-500/[0.15] text-white border border-indigo-500/20'
-                        : 'text-neutral-500 hover:text-neutral-200 hover:bg-white/[0.05] border border-transparent'
-                    }`}
-                  >
-                    <Icon size={15} className={active ? 'text-indigo-300' : 'text-neutral-600'} />
-                    {label}
-                    {showApprovalsBadge ? (
-                      <span className="ml-auto text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full px-1.5 py-0.5 min-w-[18px] text-center leading-none">
-                        {pendingApprovals > 99 ? '99+' : pendingApprovals}
-                      </span>
-                    ) : showActivityDot ? (
-                      <span className="ml-auto w-2 h-2 rounded-full bg-indigo-400 pulse-dot" />
-                    ) : (
-                      active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-400" />
-                    )}
-                  </Link>
-                );
-              })}
+            <nav className="flex-1 px-3 mt-1 overflow-y-auto">
+              {navGroups.map(({ label: groupLabel, items }) => (
+                <div key={groupLabel} className="mb-3">
+                  <p className="text-[10px] uppercase tracking-widest text-neutral-600 px-3 mb-1">{groupLabel}</p>
+                  <div className="space-y-0.5">
+                    {items.map(({ href, label, icon: Icon, exact }) => {
+                      const active = exact ? pathname === href : pathname.startsWith(href);
+                      const isApprovals = href === '/approvals';
+                      const isActivity = href === '/activity';
+                      const showApprovalsBadge = isApprovals && pendingApprovals > 0;
+                      const showActivityDot = isActivity && hasNewActivity;
+                      return (
+                        <Link
+                          key={href}
+                          href={href}
+                          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-150 ${
+                            active
+                              ? 'bg-indigo-500/[0.15] text-white border border-indigo-500/20'
+                              : 'text-neutral-500 hover:text-neutral-200 hover:bg-white/[0.05] border border-transparent'
+                          }`}
+                        >
+                          <Icon size={15} className={active ? 'text-indigo-300' : 'text-neutral-600'} />
+                          {label}
+                          {showApprovalsBadge ? (
+                            <span className="ml-auto text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full px-1.5 py-0.5 min-w-[18px] text-center leading-none">
+                              {pendingApprovals > 99 ? '99+' : pendingApprovals}
+                            </span>
+                          ) : showActivityDot ? (
+                            <span className="ml-auto w-2 h-2 rounded-full bg-indigo-400 pulse-dot" />
+                          ) : (
+                            active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </nav>
             <div className="border-t border-white/[0.06]">
               <PingBabbage />
