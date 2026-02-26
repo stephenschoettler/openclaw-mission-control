@@ -4,7 +4,7 @@ import "./globals.css";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { LayoutDashboard, CheckSquare, CalendarDays, FolderOpen, Users, Film, Zap, Inbox, Activity, Send, Monitor, DollarSign, LogOut, Puzzle, BarChart2 } from "lucide-react";
+import { LayoutDashboard, CheckSquare, CalendarDays, FolderOpen, Users, Film, Zap, Inbox, Activity, Send, Monitor, DollarSign, LogOut, Puzzle, BarChart2, Menu, X } from "lucide-react";
 
 const navGroups = [
   {
@@ -155,6 +155,7 @@ function LogoutButton() {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingApprovals, setPendingApprovals] = useState(0);
   const [latestActivityId, setLatestActivityId] = useState(0);
   const [seenActivityId, setSeenActivityId] = useState(0);
@@ -218,6 +219,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     }
   }, [pathname, latestActivityId]);
 
+  // Close sidebar on route change (mobile)
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [pathname]);
+
   const hasNewActivity = latestActivityId > seenActivityId && seenActivityId > 0;
 
   // Login page gets a bare layout (no sidebar)
@@ -244,8 +250,35 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="antialiased">
         <div className="flex h-screen">
+          {/* Mobile top bar */}
+          <div className="lg:hidden fixed top-0 left-0 right-0 z-30 h-12 bg-[#0c0c14] border-b border-white/[0.06] flex items-center justify-between px-4">
+            <Link href="/" className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">🚀</div>
+              <span className="text-sm font-bold text-white tracking-tight">Mission Control</span>
+            </Link>
+            <button
+              onClick={() => setSidebarOpen(o => !o)}
+              className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-white/[0.06] transition-all"
+            >
+              {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
+            </button>
+          </div>
+
+          {/* Mobile overlay */}
+          {sidebarOpen && (
+            <div
+              className="lg:hidden fixed inset-0 z-20 bg-black/60 backdrop-blur-sm"
+              onClick={() => setSidebarOpen(false)}
+            />
+          )}
+
           {/* Sidebar */}
-          <aside className="w-[200px] flex-shrink-0 border-r border-white/[0.06] bg-[#0c0c14] flex flex-col">
+          <aside className={`
+            fixed lg:relative z-20 top-0 left-0 h-full
+            w-[200px] flex-shrink-0 border-r border-white/[0.06] bg-[#0c0c14] flex flex-col
+            transition-transform duration-200
+            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+          `}>
             <Link href="/" className="block px-5 pt-5 pb-4 group">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold">
@@ -311,7 +344,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </aside>
 
           {/* Main content */}
-          <main className="flex-1 overflow-auto p-6 dot-grid">
+          <main className="flex-1 overflow-auto p-4 lg:p-6 dot-grid pt-16 lg:pt-6">
             {children}
           </main>
         </div>

@@ -91,7 +91,7 @@ function parseUtc(dateStr: string): Date {
 function resolveStatus(status: string, updatedAt: string): string {
   if (status !== 'working') return status;
   const ageMs = Date.now() - parseUtc(updatedAt).getTime();
-  return ageMs > 10 * 60 * 1000 ? 'idle' : 'working';
+  return ageMs > 3 * 60 * 1000 ? 'idle' : 'working';
 }
 
 function relativeTime(dateStr: string): string {
@@ -293,7 +293,7 @@ export default function CommandCenterPage() {
       </section>
 
       {/* Middle row: Approvals + Activity + Events */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         {/* Pending Approvals */}
         <div className="card p-5 shimmer-hover relative overflow-hidden">
           <div className="flex items-center justify-between mb-3">
@@ -434,7 +434,7 @@ export default function CommandCenterPage() {
       </div>
 
       {/* Bottom: Quick stats */}
-      <div className="grid grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="card p-4 shimmer-hover relative overflow-hidden">
           <div className="flex items-center gap-2 mb-2.5">
             <div className="w-8 h-8 rounded-lg bg-indigo-500/15 flex items-center justify-center shrink-0">

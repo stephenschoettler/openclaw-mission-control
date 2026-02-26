@@ -108,7 +108,7 @@ function parseUtc(dateStr: string): Date {
 function resolveStatus(status: string, updatedAt: string): string {
   if (status !== 'working') return status;
   const ageMs = Date.now() - parseUtc(updatedAt).getTime();
-  return ageMs > 10 * 60 * 1000 ? 'idle' : 'working';
+  return ageMs > 3 * 60 * 1000 ? 'idle' : 'working';
 }
 
 // ── Wide (horizontal) card ────────────────────────────────────────────────────
@@ -351,7 +351,7 @@ export default function TeamPage() {
         <FlowLabel label="⚡ SUPPORT" />
 
         {/* Tier 5 — Support 3-col */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {SUPPORT.map(a => (
             <GridCard key={a.id} agent={a} {...getInfo(a.id)} />
           ))}

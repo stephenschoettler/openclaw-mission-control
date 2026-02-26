@@ -320,7 +320,7 @@ export default function TasksPage() {
         )}
 
         {/* Board */}
-        <div className="flex gap-4 flex-1 min-h-0">
+        <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
 
           {/* Left: Queue + Active stacked */}
           <div className="flex-1 min-w-0 flex flex-col gap-4 overflow-y-auto">
@@ -433,7 +433,7 @@ export default function TasksPage() {
           </div>
 
           {/* RIGHT — Done column */}
-          <div className="w-80 flex-shrink-0">
+          <div className="lg:w-80 flex-shrink-0">
             <div className="card p-4 h-full flex flex-col">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-2 h-2 rounded-full bg-green-400" />
