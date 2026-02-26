@@ -1,6 +1,7 @@
 'use client';
 {/* pipeline-test-ok */}
 {/* pipeline-test-2-ok */}
+{/* pipeline-test-3-ok */}
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
