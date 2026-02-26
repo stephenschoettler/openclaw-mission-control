@@ -72,7 +72,7 @@ export async function PATCH(req: NextRequest) {
       const { spawn, execSync } = require('child_process');
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const fs = require('fs');
-      const home = '/home/w0lf';
+      const home = process.env.HOME || require('os').homedir();
       const openclawMjs = `${home}/dev/openclaw/openclaw.mjs`;
       let sha = 'unknown';
       try { sha = execSync(`git -C ${home}/mission-control rev-parse --short HEAD`, { encoding: 'utf8' }).trim(); } catch { /* ignore */ }
@@ -97,7 +97,7 @@ export async function PATCH(req: NextRequest) {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const fs = require('fs');
       const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date());
-      const memDir = '/home/w0lf/.openclaw/workspace/memory';
+      const memDir = `${process.env.HOME || require('os').homedir()}/.openclaw/workspace/memory`;
       const memPath = `${memDir}/${date}.md`;
       const line = `\n- ✅ Task completed: "${task.title}" (assigned: ${task.assignee}, ${date})\n`;
       fs.mkdirSync(memDir, { recursive: true });
