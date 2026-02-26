@@ -42,7 +42,7 @@ export async function PATCH(req: NextRequest) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const fs = require('fs');
-      const date = new Date().toISOString().slice(0, 10);
+      const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date());
       const memDir = '/home/w0lf/.openclaw/workspace/memory';
       const memPath = `${memDir}/${date}.md`;
       const line = `\n- ✅ Task completed: "${task.title}" (assigned: ${task.assignee}, ${date})\n`;

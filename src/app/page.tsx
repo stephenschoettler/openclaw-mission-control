@@ -170,8 +170,8 @@ export default function CommandCenterPage() {
   };
   const totalTasks = tasks.length;
   const donePercent = totalTasks > 0 ? Math.round((taskCounts.done / totalTasks) * 100) : 0;
-  const todayUtc = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
-  const doneToday = tasks.filter(t => t.status === 'done' && t.updated_at && t.updated_at.slice(0, 10) === todayUtc).length;
+  const todayPst = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date()); // "YYYY-MM-DD" in PST
+  const doneToday = tasks.filter(t => t.status === 'done' && t.updated_at && new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date(t.updated_at)) === todayPst).length;
 
   return (
     <div className="max-w-6xl mx-auto">
