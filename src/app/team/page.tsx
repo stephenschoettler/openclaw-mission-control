@@ -125,7 +125,7 @@ function SubAgentCard({ agent, status, currentTask }: { agent: AgentMeta; status
   const opacity = !isWorking && !isIdle ? 'opacity-50 grayscale' : isIdle ? 'opacity-70' : '';
 
   return (
-    <div className={`flex flex-col gap-2 rounded-xl border p-3 bg-[#1e1e20] transition-all duration-300 ${border} ${opacity}`}>
+    <div className={`flex flex-col gap-2 rounded-xl border p-3 bg-[#1e1e20] transition-all duration-300 min-h-[72px] ${border} ${opacity}`}>
       <div className="flex items-center gap-2">
         <div className="relative flex-shrink-0">
           {isWorking && (
@@ -143,17 +143,9 @@ function SubAgentCard({ agent, status, currentTask }: { agent: AgentMeta; status
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-bold text-white/90 truncate">{agent.name}</p>
+          <p className="text-xs font-bold text-white/90 break-words leading-tight">{agent.name}</p>
           <p className="text-[10px] text-neutral-500 leading-tight truncate">{agent.title}</p>
         </div>
-      </div>
-
-      <div className="flex flex-wrap gap-1">
-        {agent.tags.slice(0, 2).map(tag => (
-          <span key={tag} className={`text-[9px] px-1.5 py-0.5 rounded-full border font-medium ${ACCENT_TAG[agent.accent]}`}>
-            {tag}
-          </span>
-        ))}
       </div>
 
       {isWorking && currentTask && (
@@ -193,7 +185,7 @@ function ExpandableManagerCard({
   const opacity = !isWorking && !isIdle ? 'opacity-50 grayscale' : isIdle ? 'opacity-75' : '';
 
   return (
-    <div className={`flex flex-col rounded-2xl border bg-[#252528] overflow-hidden transition-all duration-300 ${baseBorder} ${opacity}`}>
+    <div className={`flex flex-col rounded-2xl border bg-[#252528] transition-all duration-300 ${baseBorder} ${opacity}`}>
       {/* Clickable header */}
       <div
         className="flex flex-col gap-3 p-4 cursor-pointer select-none hover:bg-white/[0.02] transition-colors duration-200 rounded-2xl"
@@ -267,7 +259,7 @@ function ExpandableManagerCard({
           <p className="text-[10px] font-bold text-neutral-500 tracking-[0.12em] uppercase mb-2.5">
             Sub-team · {subAgents.length} members
           </p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {subAgents.map(sub => (
               <SubAgentCard key={sub.id} agent={sub} {...getInfo(sub.id)} />
             ))}
@@ -452,7 +444,7 @@ export default function TeamPage() {
         <WideCard agent={BABBAGE} {...getInfo(BABBAGE.id)} />
         <FlowLabel label="⚙ OPERATIONS" />
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {MANAGERS.map(a =>
             expandableIds.has(a.id) ? (
               <ExpandableManagerCard
