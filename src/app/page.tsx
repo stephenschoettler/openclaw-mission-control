@@ -171,7 +171,7 @@ export default function CommandCenterPage() {
   const totalTasks = tasks.length;
   const donePercent = totalTasks > 0 ? Math.round((taskCounts.done / totalTasks) * 100) : 0;
   const todayPst = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date()); // "YYYY-MM-DD" in PST
-  const doneToday = tasks.filter(t => t.status === 'done' && t.updated_at && new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date(t.updated_at)) === todayPst).length;
+  const doneToday = tasks.filter(t => t.status === 'done' && t.updated_at && new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(parseUtc(t.updated_at)) === todayPst).length;
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -454,8 +454,8 @@ export default function CommandCenterPage() {
             </div>
             <span className="text-[11px] text-neutral-500 font-semibold tracking-wide">Tasks</span>
           </div>
-          <p className={`text-2xl font-extrabold ${totalTasks === 0 ? 'text-neutral-600' : 'text-white'}`}>{totalTasks}</p>
-          <p className="text-[10px] text-neutral-600 mt-0.5">{taskCounts.inProgress} in progress</p>
+          <p className={`text-2xl font-extrabold ${taskCounts.inProgress === 0 ? 'text-neutral-600' : 'text-yellow-400'}`}>{taskCounts.inProgress}</p>
+          <p className="text-[10px] text-neutral-600 mt-0.5">in progress</p>
         </div>
 
         <div className="card p-4 shimmer-hover relative overflow-hidden">
