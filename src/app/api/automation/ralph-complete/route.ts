@@ -46,7 +46,9 @@ export async function GET() {
     setState('last_processed_ralph_id', ralphEnd.id);
 
     // Check if Ralph rejected or approved
-    const isRejected = ralphEnd.title.includes('REJECTED') || ralphEnd.title.includes('❌');
+    // New format: "QA REJECTED: ..." vs "QA APPROVED: ..."
+    // Legacy format: "QA complete: ..." (treated as approved)
+    const isRejected = ralphEnd.title.includes('REJECTED') || ralphEnd.title.includes('❌') || ralphEnd.title.toLowerCase().includes('rejected');
 
     let updated;
     if (isRejected) {
