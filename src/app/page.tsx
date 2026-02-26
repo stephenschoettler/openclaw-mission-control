@@ -91,7 +91,7 @@ function parseUtc(dateStr: string): Date {
 function resolveStatus(status: string, updatedAt: string): string {
   if (status !== 'working') return status;
   const ageMs = Date.now() - parseUtc(updatedAt).getTime();
-  return ageMs > 3 * 60 * 1000 ? 'idle' : 'working';
+  return ageMs > 10 * 60 * 1000 ? 'idle' : 'working';
 }
 
 function relativeTime(dateStr: string): string {

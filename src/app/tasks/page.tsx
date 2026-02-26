@@ -16,43 +16,31 @@ interface Task {
   updated_at: string;
 }
 
-const FILTER_TABS = ['All', 'Sir', 'Babbage'];
-
-const ALWAYS_AGENTS = [
-  { id: 'babbage', label: 'Babbage', match: (a: string) => a.toLowerCase() === 'babbage' },
-  { id: 'code-monkey', label: 'Code Monkey', match: (a: string) => a.toLowerCase() === 'code monkey' || a.toLowerCase() === 'code-monkey' },
-  { id: 'ralph', label: 'Ralph', match: (a: string) => a.toLowerCase() === 'ralph' },
-];
-
-const OTHER_AGENT_DEFS = [
-  { id: 'hustle', label: 'Hustle', match: (a: string) => a.toLowerCase() === 'hustle' },
-  { id: 'answring', label: 'Answring', match: (a: string) => a.toLowerCase().startsWith('answring') },
-  { id: 'roadie', label: 'Roadie', match: (a: string) => a.toLowerCase() === 'roadie' },
-  { id: 'tldr', label: 'TLDR', match: (a: string) => a.toLowerCase() === 'tldr' },
-];
-
-const ALL_AGENT_DEFS = [...ALWAYS_AGENTS, ...OTHER_AGENT_DEFS];
-
-// Map agent column IDs to canonical assignee strings used when reassigning
-const AGENT_ASSIGNEE_MAP: Record<string, string> = {
-  'babbage': 'Babbage',
-  'code-monkey': 'Code Monkey',
-  'ralph': 'Ralph',
-  'hustle': 'Hustle',
-  'answring': 'Answring Ops',
-  'roadie': 'Roadie',
-  'tldr': 'TLDR',
-};
-
 const ASSIGNEES = ['me', 'Sir', 'Babbage', 'Hustle', 'Code Monkey', 'Roadie', 'TLDR', 'Answring Ops', 'Ralph'];
 const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
 const ALL_STATUSES = ['backlog', 'recurring', 'in-progress', 'review', 'done'];
 
 const priorityConfig: Record<string, { color: string; border: string }> = {
-  low: { color: 'text-neutral-400', border: 'border-l-neutral-500' },
-  medium: { color: 'text-blue-400', border: 'border-l-blue-500' },
-  high: { color: 'text-orange-400', border: 'border-l-orange-500' },
-  urgent: { color: 'text-red-400', border: 'border-l-red-500' },
+  low:    { color: 'text-neutral-400', border: 'border-l-neutral-500' },
+  medium: { color: 'text-blue-400',    border: 'border-l-blue-500'    },
+  high:   { color: 'text-orange-400',  border: 'border-l-orange-500'  },
+  urgent: { color: 'text-red-400',     border: 'border-l-red-500'     },
+};
+
+// Assignee → short pill color
+const assigneeColor = (a: string): string => {
+  const map: Record<string, string> = {
+    babbage:     'bg-violet-500/20 text-violet-300',
+    'code monkey': 'bg-blue-500/20 text-blue-300',
+    'code-monkey': 'bg-blue-500/20 text-blue-300',
+    ralph:       'bg-emerald-500/20 text-emerald-300',
+    hustle:      'bg-pink-500/20 text-pink-300',
+    roadie:      'bg-amber-500/20 text-amber-300',
+    tldr:        'bg-cyan-500/20 text-cyan-300',
+    sir:         'bg-indigo-500/20 text-indigo-300',
+    me:          'bg-indigo-500/20 text-indigo-300',
+  };
+  return map[a.toLowerCase()] ?? 'bg-white/[0.08] text-neutral-400';
 };
 
 function parseUtc(dateStr: string): Date {
@@ -64,22 +52,18 @@ function timeAgo(dateStr: string): string {
   const diff = Date.now() - parseUtc(dateStr).getTime();
   const days = Math.floor(diff / 86400000);
   if (days === 0) return 'today';
-  if (days === 1) return '1 day ago';
-  return `${days} days ago`;
+  if (days === 1) return '1d ago';
+  return `${days}d ago`;
 }
 
 function formatLastUpdated(date: Date): string {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-/** If a task has been in-progress for >24h, it's stale */
-function resolveStatus(task: Task): { stale: boolean } {
-  if (task.status === 'in-progress') {
-    const updated = parseUtc(task.updated_at || task.created_at);
-    const hoursAgo = (Date.now() - updated.getTime()) / 3600000;
-    return { stale: hoursAgo > 24 };
-  }
-  return { stale: false };
+function isStale(task: Task): boolean {
+  if (task.status !== 'in-progress') return false;
+  const updated = parseUtc(task.updated_at || task.created_at);
+  return (Date.now() - updated.getTime()) / 3600000 > 24;
 }
 
 function TaskCard({
@@ -99,24 +83,29 @@ function TaskCard({
   isDragging?: boolean;
 }) {
   const pCfg = priorityConfig[task.priority] || priorityConfig.medium;
-  const { stale } = resolveStatus(task);
-  const isRecurring = task.status === 'recurring';
+  const stale = isStale(task);
   const isReview = task.status === 'review';
   const isInProgress = task.status === 'in-progress';
+  const isRecurring = task.status === 'recurring';
 
   return (
     <div
       {...dragHandleProps}
-      className={`p-3 bg-white/[0.03] border border-white/[0.06] border-l-2 ${pCfg.border} rounded-lg group hover:border-white/[0.12] hover:bg-white/[0.05] transition-all ${stale ? 'opacity-60' : ''} ${isDragging ? 'shadow-lg shadow-black/40 rotate-1 opacity-90' : ''} cursor-grab active:cursor-grabbing`}
+      className={`p-3 bg-white/[0.03] border border-white/[0.06] border-l-2 ${pCfg.border} rounded-lg group
+        hover:border-white/[0.12] hover:bg-white/[0.05] transition-all
+        ${stale ? 'opacity-60' : ''}
+        ${isDragging ? 'shadow-xl shadow-black/50 rotate-1 opacity-90 scale-[1.02]' : ''}
+        cursor-grab active:cursor-grabbing`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
+          {/* Title row */}
           <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-            {isRecurring && <span title="Recurring" className="text-purple-400 text-[11px]">🔁</span>}
-            {isReview && showStatusBadge && (
+            {isRecurring && <span className="text-purple-400 text-[11px]" title="Recurring">🔁</span>}
+            {showStatusBadge && isReview && (
               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 flex-shrink-0">REVIEW</span>
             )}
-            {isInProgress && showStatusBadge && (
+            {showStatusBadge && isInProgress && (
               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 flex-shrink-0">ACTIVE</span>
             )}
             <button
@@ -132,21 +121,29 @@ function TaskCard({
             )}
             {stale && <span className="text-[9px] text-orange-400/70 flex-shrink-0">stale</span>}
           </div>
-          {task.description && <p className="text-xs text-neutral-500 mt-1 line-clamp-2">{task.description}</p>}
-        </div>
-      </div>
-      <div className="flex items-center justify-between mt-2">
-        <div className="flex items-center gap-2">
-          <span className={`text-[10px] font-semibold ${pCfg.color}`}>{task.priority}</span>
-          <span className="text-[10px] text-neutral-600">{timeAgo(task.created_at)}</span>
+          {task.description && (
+            <p className="text-xs text-neutral-500 mt-1 line-clamp-2">{task.description}</p>
+          )}
         </div>
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
-          className="p-0.5 hover:text-red-400 text-neutral-700 transition-colors opacity-0 group-hover:opacity-100"
+          className="p-0.5 hover:text-red-400 text-neutral-700 transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0 mt-0.5"
           title="Delete"
         >
           <Trash2 size={13} />
         </button>
+      </div>
+
+      {/* Footer row */}
+      <div className="flex items-center justify-between mt-2 gap-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {/* Assignee pill */}
+          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${assigneeColor(task.assignee)}`}>
+            {task.assignee}
+          </span>
+          <span className={`text-[10px] font-semibold ${pCfg.color}`}>{task.priority}</span>
+        </div>
+        <span className="text-[10px] text-neutral-600 flex-shrink-0">{timeAgo(task.created_at)}</span>
       </div>
     </div>
   );
@@ -157,7 +154,6 @@ export default function TasksPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [form, setForm] = useState({ title: '', description: '', assignee: 'me', priority: 'medium', status: 'backlog' });
-  const [activeFilter, setActiveFilter] = useState('All');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const fetchTasks = useCallback(async () => {
@@ -196,7 +192,13 @@ export default function TasksPage() {
     setShowForm(true);
   };
 
-  // Drag-and-drop handler
+  const openNew = (status = 'backlog') => {
+    setEditingTask(null);
+    setForm({ title: '', description: '', assignee: 'me', priority: 'medium', status });
+    setShowForm(true);
+  };
+
+  // Drag-and-drop
   const onDragEnd = useCallback(async (result: DropResult) => {
     const { destination, draggableId } = result;
     if (!destination) return;
@@ -205,81 +207,41 @@ export default function TasksPage() {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
 
-    // droppableId format: "queue|agentId", "active|agentId", "done"
-    const [destPanel, destAgentId] = destination.droppableId.split('|');
+    const destId = destination.droppableId; // "queue" | "active" | "done"
+    const newStatus =
+      destId === 'queue'  ? 'backlog'     :
+      destId === 'active' ? 'in-progress' :
+      'done';
 
-    let newStatus: string;
-    if (destPanel === 'queue') newStatus = 'backlog';
-    else if (destPanel === 'active') newStatus = 'in-progress';
-    else newStatus = 'done';
-
-    // Determine new assignee: if agentId present and known, remap; otherwise keep existing
-    let newAssignee = task.assignee;
-    if (destAgentId && destAgentId !== 'unknown' && AGENT_ASSIGNEE_MAP[destAgentId]) {
-      newAssignee = AGENT_ASSIGNEE_MAP[destAgentId];
-    }
-
-    // No-op if nothing changed
-    if (newStatus === task.status && newAssignee === task.assignee) return;
+    if (newStatus === task.status) return;
 
     // Optimistic update
-    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus, assignee: newAssignee } : t));
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
 
     await fetch('/api/tasks', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: taskId, status: newStatus, assignee: newAssignee }),
+      body: JSON.stringify({ id: taskId, status: newStatus }),
     });
 
-    // Refresh in background
     fetchTasks();
   }, [tasks, fetchTasks]);
 
-  // Filter tasks by assignee tab
-  const filteredTasks = activeFilter === 'All'
-    ? tasks
-    : tasks.filter(t => t.assignee.toLowerCase() === activeFilter.toLowerCase());
-
-  // Stats
-  const inProgress = tasks.filter(t => t.status === 'in-progress').length;
-  const done = tasks.filter(t => t.status === 'done').length;
-  const completion = tasks.length > 0 ? Math.round((done / tasks.length) * 100) : 0;
-
-  // Figure out which "other" agents have tasks to show
-  const otherAgentsWithTasks = OTHER_AGENT_DEFS.filter(agent =>
-    filteredTasks.some(t => agent.match(t.assignee))
-  );
-  const visibleAgents = [...ALWAYS_AGENTS, ...otherAgentsWithTasks];
-
-  // Partition tasks
-  const queueTasks = (agentDef: typeof ALWAYS_AGENTS[0]) =>
-    filteredTasks.filter(t => agentDef.match(t.assignee) && (t.status === 'backlog' || t.status === 'recurring'));
-
-  const activeTasks = (agentDef: typeof ALWAYS_AGENTS[0]) =>
-    filteredTasks.filter(t => agentDef.match(t.assignee) && (t.status === 'in-progress' || t.status === 'review'));
-
-  const doneTasks = [...filteredTasks]
+  // Partitions
+  const queueTasks = tasks.filter(t => t.status === 'backlog' || t.status === 'recurring');
+  const activeTasks = tasks.filter(t => t.status === 'in-progress' || t.status === 'review');
+  const doneTasks = [...tasks]
     .filter(t => t.status === 'done')
     .sort((a, b) => parseUtc(b.updated_at || b.created_at).getTime() - parseUtc(a.updated_at || a.created_at).getTime())
     .slice(0, 10);
 
-  // Unknown agent tasks (not matched by any agent def) — dump into a misc column
-  const knownAssignees = (t: Task) => ALL_AGENT_DEFS.some(a => a.match(t.assignee));
-  const unknownQueue = filteredTasks.filter(t => !knownAssignees(t) && (t.status === 'backlog' || t.status === 'recurring'));
-  const unknownActive = filteredTasks.filter(t => !knownAssignees(t) && (t.status === 'in-progress' || t.status === 'review'));
-  const hasUnknown = unknownQueue.length > 0 || unknownActive.length > 0;
-
-  const openNew = (status = 'backlog') => {
-    setEditingTask(null);
-    setForm({ title: '', description: '', assignee: 'me', priority: 'medium', status });
-    setShowForm(true);
-  };
-
-  const gridCols = visibleAgents.length + (hasUnknown ? 1 : 0);
+  // Stats
+  const completion = tasks.length > 0 ? Math.round((doneTasks.length / tasks.length) * 100) : 0;
 
   return (
     <DragDropContext onDragEnd={onDragEnd}>
       <div className="flex flex-col h-full">
+
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -299,8 +261,12 @@ export default function TasksPage() {
         {/* Stats Bar */}
         <div className="flex items-center gap-6 mb-4 px-1">
           <div className="flex items-baseline gap-1.5">
-            <span className="text-xl font-bold text-white">{inProgress}</span>
-            <span className="text-xs text-neutral-500">In progress</span>
+            <span className="text-xl font-bold text-white">{activeTasks.length}</span>
+            <span className="text-xs text-neutral-500">Active</span>
+          </div>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-xl font-bold text-white">{queueTasks.length}</span>
+            <span className="text-xs text-neutral-500">Queued</span>
           </div>
           <div className="flex items-baseline gap-1.5">
             <span className="text-xl font-bold text-white">{tasks.length}</span>
@@ -308,28 +274,11 @@ export default function TasksPage() {
           </div>
           <div className="flex items-baseline gap-1.5">
             <span className={`text-xl font-bold ${completion >= 50 ? 'text-green-400' : 'text-white'}`}>{completion}%</span>
-            <span className="text-xs text-neutral-500">Completion</span>
+            <span className="text-xs text-neutral-500">Done</span>
           </div>
           <button onClick={fetchTasks} className="ml-auto p-1.5 rounded-lg text-neutral-600 hover:text-neutral-300 hover:bg-white/[0.05] transition-all" title="Refresh">
             <RefreshCw size={13} />
           </button>
-        </div>
-
-        {/* Filter Tabs */}
-        <div className="flex items-center gap-1 mb-4">
-          {FILTER_TABS.map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveFilter(tab)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                activeFilter === tab
-                  ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-                  : 'text-neutral-500 hover:text-neutral-300 hover:bg-white/[0.05]'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
         </div>
 
         {/* Edit / Add Form */}
@@ -370,241 +319,117 @@ export default function TasksPage() {
           </div>
         )}
 
-        {/* Two-panel + Done layout */}
+        {/* Board */}
         <div className="flex gap-4 flex-1 min-h-0">
-          {/* Left: agent columns grid */}
-          <div className="flex-1 min-w-0 flex flex-col gap-4">
 
-            {/* TOP PANEL — Queues */}
+          {/* Left: Queue + Active stacked */}
+          <div className="flex-1 min-w-0 flex flex-col gap-4 overflow-y-auto">
+
+            {/* QUEUE panel */}
             <div className="card p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-2 h-2 rounded-full bg-blue-400" />
-                <h3 className="text-xs font-bold text-neutral-300 uppercase tracking-widest">Queues</h3>
-                <span className="text-[10px] text-neutral-600">backlog · recurring</span>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-blue-400" />
+                  <h3 className="text-xs font-bold text-neutral-300 uppercase tracking-widest">Queue</h3>
+                  <span className="text-[10px] text-neutral-600">backlog · recurring</span>
+                  {queueTasks.length > 0 && (
+                    <span className="text-[10px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded-full font-medium">{queueTasks.length}</span>
+                  )}
+                </div>
+                <button
+                  onClick={() => openNew('backlog')}
+                  className="w-6 h-6 rounded flex items-center justify-center text-neutral-600 hover:text-neutral-300 hover:bg-white/[0.06] transition-all"
+                  title="Add to queue"
+                >
+                  <Plus size={13} />
+                </button>
               </div>
-              <div
-                className="grid gap-3"
-                style={{ gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))` }}
-              >
-                {visibleAgents.map(agent => {
-                  const agentQueue = queueTasks(agent);
-                  const droppableId = `queue|${agent.id}`;
-                  return (
-                    <div key={agent.id} className="flex flex-col min-w-0">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-semibold text-neutral-300">{agent.label}</span>
-                          {agentQueue.length > 0 && (
-                            <span className="text-[10px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded-full font-medium">{agentQueue.length}</span>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => openNew('backlog')}
-                          className="w-5 h-5 rounded flex items-center justify-center text-neutral-700 hover:text-neutral-400 hover:bg-white/[0.06] transition-all"
-                          title="Add to queue"
-                        >
-                          <Plus size={11} />
-                        </button>
+
+              <Droppable droppableId="queue">
+                {(provided, snapshot) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className={`min-h-[56px] rounded-lg p-1 -m-1 transition-colors ${snapshot.isDraggingOver ? 'bg-blue-500/10 ring-1 ring-blue-500/30' : ''}`}
+                  >
+                    {queueTasks.length === 0 && !snapshot.isDraggingOver ? (
+                      <div className="flex items-center gap-1.5 py-3 px-2 rounded-lg bg-white/[0.02] border border-dashed border-white/[0.06]">
+                        <span className="text-[11px] text-green-500/60">Queue clear ✓</span>
                       </div>
-                      <Droppable droppableId={droppableId}>
-                        {(provided, snapshot) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.droppableProps}
-                            className={`min-h-[48px] rounded-lg transition-colors ${snapshot.isDraggingOver ? 'bg-blue-500/10 border border-blue-500/30' : ''}`}
-                          >
-                            {agentQueue.length === 0 && !snapshot.isDraggingOver ? (
-                              <div className="flex items-center gap-1.5 py-3 px-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
-                                <span className="text-[11px] text-green-500/70">Queue clear ✓</span>
-                              </div>
-                            ) : (
-                              <div className="space-y-2">
-                                {agentQueue.map((task, index) => (
-                                  <Draggable key={task.id} draggableId={String(task.id)} index={index}>
-                                    {(dragProvided, dragSnapshot) => (
-                                      <div
-                                        ref={dragProvided.innerRef}
-                                        {...dragProvided.draggableProps}
-                                      >
-                                        <TaskCard
-                                          task={task}
-                                          onEdit={startEdit}
-                                          onDelete={deleteTask}
-                                          dragHandleProps={dragProvided.dragHandleProps}
-                                          isDragging={dragSnapshot.isDragging}
-                                        />
-                                      </div>
-                                    )}
-                                  </Draggable>
-                                ))}
+                    ) : (
+                      <div className="space-y-2">
+                        {queueTasks.map((task, index) => (
+                          <Draggable key={task.id} draggableId={String(task.id)} index={index}>
+                            {(dragProvided, dragSnapshot) => (
+                              <div ref={dragProvided.innerRef} {...dragProvided.draggableProps}>
+                                <TaskCard
+                                  task={task}
+                                  onEdit={startEdit}
+                                  onDelete={deleteTask}
+                                  dragHandleProps={dragProvided.dragHandleProps}
+                                  isDragging={dragSnapshot.isDragging}
+                                />
                               </div>
                             )}
-                            {provided.placeholder}
-                          </div>
-                        )}
-                      </Droppable>
-                    </div>
-                  );
-                })}
-                {hasUnknown && (
-                  <div className="flex flex-col min-w-0">
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <span className="text-xs font-semibold text-neutral-400">Other</span>
-                      {unknownQueue.length > 0 && (
-                        <span className="text-[10px] bg-white/[0.08] text-neutral-400 px-1.5 py-0.5 rounded-full">{unknownQueue.length}</span>
-                      )}
-                    </div>
-                    <Droppable droppableId="queue|unknown">
-                      {(provided, snapshot) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.droppableProps}
-                          className={`min-h-[48px] rounded-lg transition-colors ${snapshot.isDraggingOver ? 'bg-blue-500/10 border border-blue-500/30' : ''}`}
-                        >
-                          {unknownQueue.length === 0 && !snapshot.isDraggingOver ? (
-                            <div className="flex items-center gap-1.5 py-3 px-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
-                              <span className="text-[11px] text-green-500/70">Queue clear ✓</span>
-                            </div>
-                          ) : (
-                            <div className="space-y-2">
-                              {unknownQueue.map((task, index) => (
-                                <Draggable key={task.id} draggableId={String(task.id)} index={index}>
-                                  {(dragProvided, dragSnapshot) => (
-                                    <div ref={dragProvided.innerRef} {...dragProvided.draggableProps}>
-                                      <TaskCard
-                                        task={task}
-                                        onEdit={startEdit}
-                                        onDelete={deleteTask}
-                                        dragHandleProps={dragProvided.dragHandleProps}
-                                        isDragging={dragSnapshot.isDragging}
-                                      />
-                                    </div>
-                                  )}
-                                </Draggable>
-                              ))}
-                            </div>
-                          )}
-                          {provided.placeholder}
-                        </div>
-                      )}
-                    </Droppable>
+                          </Draggable>
+                        ))}
+                      </div>
+                    )}
+                    {provided.placeholder}
                   </div>
                 )}
-              </div>
+              </Droppable>
             </div>
 
-            {/* BOTTOM PANEL — Active */}
+            {/* ACTIVE panel */}
             <div className="card p-4">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-2 h-2 rounded-full bg-yellow-400" />
                 <h3 className="text-xs font-bold text-neutral-300 uppercase tracking-widest">Active</h3>
                 <span className="text-[10px] text-neutral-600">in-progress · review</span>
-              </div>
-              <div
-                className="grid gap-3"
-                style={{ gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))` }}
-              >
-                {visibleAgents.map(agent => {
-                  const agentActive = activeTasks(agent);
-                  const isFree = agentActive.length === 0;
-                  const droppableId = `active|${agent.id}`;
-                  return (
-                    <div key={agent.id} className="flex flex-col min-w-0">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-semibold text-neutral-300">{agent.label}</span>
-                          {agentActive.length > 0 && (
-                            <span className="text-[10px] bg-yellow-500/20 text-yellow-300 px-1.5 py-0.5 rounded-full font-medium">{agentActive.length}</span>
-                          )}
-                        </div>
-                      </div>
-                      <Droppable droppableId={droppableId}>
-                        {(provided, snapshot) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.droppableProps}
-                            className={`min-h-[48px] rounded-lg transition-colors ${snapshot.isDraggingOver ? 'bg-yellow-500/10 border border-yellow-500/30' : ''}`}
-                          >
-                            {isFree && !snapshot.isDraggingOver ? (
-                              <div className="flex items-center gap-1.5 py-3 px-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
-                                <div className="w-1.5 h-1.5 rounded-full bg-green-500/60" />
-                                <span className="text-[11px] text-green-500/70">Free</span>
-                              </div>
-                            ) : (
-                              <div className="space-y-2">
-                                {agentActive.map((task, index) => (
-                                  <Draggable key={task.id} draggableId={String(task.id)} index={index}>
-                                    {(dragProvided, dragSnapshot) => (
-                                      <div ref={dragProvided.innerRef} {...dragProvided.draggableProps}>
-                                        <TaskCard
-                                          task={task}
-                                          onEdit={startEdit}
-                                          onDelete={deleteTask}
-                                          showStatusBadge
-                                          dragHandleProps={dragProvided.dragHandleProps}
-                                          isDragging={dragSnapshot.isDragging}
-                                        />
-                                      </div>
-                                    )}
-                                  </Draggable>
-                                ))}
-                              </div>
-                            )}
-                            {provided.placeholder}
-                          </div>
-                        )}
-                      </Droppable>
-                    </div>
-                  );
-                })}
-                {hasUnknown && (
-                  <div className="flex flex-col min-w-0">
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <span className="text-xs font-semibold text-neutral-400">Other</span>
-                      {unknownActive.length > 0 && (
-                        <span className="text-[10px] bg-yellow-500/20 text-yellow-300 px-1.5 py-0.5 rounded-full">{unknownActive.length}</span>
-                      )}
-                    </div>
-                    <Droppable droppableId="active|unknown">
-                      {(provided, snapshot) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.droppableProps}
-                          className={`min-h-[48px] rounded-lg transition-colors ${snapshot.isDraggingOver ? 'bg-yellow-500/10 border border-yellow-500/30' : ''}`}
-                        >
-                          {unknownActive.length === 0 && !snapshot.isDraggingOver ? (
-                            <div className="flex items-center gap-1.5 py-3 px-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
-                              <div className="w-1.5 h-1.5 rounded-full bg-green-500/60" />
-                              <span className="text-[11px] text-green-500/70">Free</span>
-                            </div>
-                          ) : (
-                            <div className="space-y-2">
-                              {unknownActive.map((task, index) => (
-                                <Draggable key={task.id} draggableId={String(task.id)} index={index}>
-                                  {(dragProvided, dragSnapshot) => (
-                                    <div ref={dragProvided.innerRef} {...dragProvided.draggableProps}>
-                                      <TaskCard
-                                        task={task}
-                                        onEdit={startEdit}
-                                        onDelete={deleteTask}
-                                        showStatusBadge
-                                        dragHandleProps={dragProvided.dragHandleProps}
-                                        isDragging={dragSnapshot.isDragging}
-                                      />
-                                    </div>
-                                  )}
-                                </Draggable>
-                              ))}
-                            </div>
-                          )}
-                          {provided.placeholder}
-                        </div>
-                      )}
-                    </Droppable>
-                  </div>
+                {activeTasks.length > 0 && (
+                  <span className="text-[10px] bg-yellow-500/20 text-yellow-300 px-1.5 py-0.5 rounded-full font-medium">{activeTasks.length}</span>
                 )}
               </div>
+
+              <Droppable droppableId="active">
+                {(provided, snapshot) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className={`min-h-[56px] rounded-lg p-1 -m-1 transition-colors ${snapshot.isDraggingOver ? 'bg-yellow-500/10 ring-1 ring-yellow-500/30' : ''}`}
+                  >
+                    {activeTasks.length === 0 && !snapshot.isDraggingOver ? (
+                      <div className="flex items-center gap-1.5 py-3 px-2 rounded-lg bg-white/[0.02] border border-dashed border-white/[0.06]">
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-500/60" />
+                        <span className="text-[11px] text-green-500/60">Nothing active</span>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {activeTasks.map((task, index) => (
+                          <Draggable key={task.id} draggableId={String(task.id)} index={index}>
+                            {(dragProvided, dragSnapshot) => (
+                              <div ref={dragProvided.innerRef} {...dragProvided.draggableProps}>
+                                <TaskCard
+                                  task={task}
+                                  onEdit={startEdit}
+                                  onDelete={deleteTask}
+                                  showStatusBadge
+                                  dragHandleProps={dragProvided.dragHandleProps}
+                                  isDragging={dragSnapshot.isDragging}
+                                />
+                              </div>
+                            )}
+                          </Draggable>
+                        ))}
+                      </div>
+                    )}
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
             </div>
+
           </div>
 
           {/* RIGHT — Done column */}
@@ -617,15 +442,16 @@ export default function TasksPage() {
                   <span className="text-[10px] bg-green-500/20 text-green-300 px-1.5 py-0.5 rounded-full font-medium">{doneTasks.length}</span>
                 )}
               </div>
+
               <Droppable droppableId="done">
                 {(provided, snapshot) => (
                   <div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
-                    className={`flex-1 min-h-[60px] rounded-lg transition-colors overflow-y-auto ${snapshot.isDraggingOver ? 'bg-green-500/10 border border-green-500/30' : ''}`}
+                    className={`flex-1 min-h-[60px] rounded-lg transition-colors overflow-y-auto ${snapshot.isDraggingOver ? 'bg-green-500/10 ring-1 ring-green-500/30' : ''}`}
                   >
                     {doneTasks.length === 0 && !snapshot.isDraggingOver ? (
-                      <div className="flex flex-col items-center justify-center h-full gap-2">
+                      <div className="flex flex-col items-center justify-center h-full gap-1">
                         <span className="text-[11px] text-neutral-600">Nothing done yet</span>
                       </div>
                     ) : (
@@ -644,9 +470,8 @@ export default function TasksPage() {
                                   <div className="w-1.5 h-1.5 rounded-full bg-green-500/60 mt-1 flex-shrink-0" />
                                   <div className="flex-1 min-w-0">
                                     <p className="text-xs text-neutral-400 line-clamp-2 leading-snug">{task.title}</p>
-                                    <div className="flex items-center gap-1.5 mt-1">
-                                      <span className="text-[10px] text-neutral-600">{task.assignee}</span>
-                                      <span className="text-[10px] text-neutral-700">·</span>
+                                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                      <span className={`text-[9px] font-semibold px-1 py-0.5 rounded-full ${assigneeColor(task.assignee)}`}>{task.assignee}</span>
                                       <span className="text-[10px] text-neutral-600">{timeAgo(task.updated_at || task.created_at)}</span>
                                     </div>
                                   </div>
@@ -663,6 +488,7 @@ export default function TasksPage() {
               </Droppable>
             </div>
           </div>
+
         </div>
       </div>
     </DragDropContext>
