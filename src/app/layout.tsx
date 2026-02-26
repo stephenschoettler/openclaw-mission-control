@@ -202,16 +202,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     return () => clearInterval(id);
   }, []);
 
-  // Sync agent status from live OpenClaw sessions every 15s
-  useEffect(() => {
-    const syncSessions = () => {
-      fetch('/api/sync-sessions', { method: 'POST' }).catch(() => {/* silent */});
-    };
-    syncSessions();
-    const id = setInterval(syncSessions, 15000);
-    return () => clearInterval(id);
-  }, []);
-
   // Mark activity as seen when navigating to /activity
   useEffect(() => {
     if (pathname === '/activity') {
@@ -252,16 +242,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="flex h-screen">
           {/* Mobile top bar */}
           <div className="lg:hidden fixed top-0 left-0 right-0 z-30 h-12 bg-[#0c0c14] border-b border-white/[0.06] flex items-center justify-between px-4">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">🚀</div>
-              <span className="text-sm font-bold text-white tracking-tight">Mission Control</span>
-            </Link>
             <button
               onClick={() => setSidebarOpen(o => !o)}
               className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-white/[0.06] transition-all"
             >
               {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
             </button>
+            <Link href="/" className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">🚀</div>
+              <span className="text-sm font-bold text-white tracking-tight">Mission Control</span>
+            </Link>
           </div>
 
           {/* Mobile overlay */}

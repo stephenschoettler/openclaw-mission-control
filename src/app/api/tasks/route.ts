@@ -30,12 +30,40 @@ export async function PATCH(req: NextRequest) {
 
   if (!resolvedId) return NextResponse.json({ error: 'id or title_match required' }, { status: 400 });
 
+  // Capture old status before update for activity logging
+  const oldTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(resolvedId) as { title: string; assignee: string; status: string } | undefined;
+  const oldStatus = oldTask?.status;
+
   const sets = Object.keys(fields).map(k => `${k} = ?`).join(', ');
   const vals = Object.values(fields);
   if (sets) {
     db.prepare(`UPDATE tasks SET ${sets}, updated_at = datetime('now') WHERE id = ?`).run(...vals, resolvedId);
   }
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(resolvedId) as { title: string; assignee: string; status: string } | undefined;
+
+  // Auto-log activity on task status transitions
+  if (fields.status && task && oldStatus && fields.status !== oldStatus) {
+    const assignee = task.assignee || 'unknown';
+    const agentName = assignee.charAt(0).toUpperCase() + assignee.slice(1).replace(/-/g, ' ');
+    type ActivityEntry = { event_type: string; title: string } | null;
+    let entry: ActivityEntry = null;
+    if (oldStatus === 'backlog' && fields.status === 'in-progress') {
+      entry = { event_type: 'task_start', title: `Started: ${task.title}` };
+    } else if (oldStatus === 'in-progress' && fields.status === 'review') {
+      entry = { event_type: 'task_end', title: `Submitted for review: ${task.title}` };
+    } else if (oldStatus === 'review' && fields.status === 'done') {
+      entry = { event_type: 'task_end', title: `Completed: ${task.title}` };
+    } else if (oldStatus === 'review' && fields.status === 'backlog') {
+      entry = { event_type: 'task_end', title: `QA REJECTED: ${task.title}` };
+    }
+    if (entry) {
+      try {
+        db.prepare(
+          'INSERT INTO activity_feed (agent_id, agent_name, event_type, title) VALUES (?, ?, ?, ?)'
+        ).run(assignee, agentName, entry.event_type, entry.title);
+      } catch { /* non-blocking */ }
+    }
+  }
 
   // Fire-and-forget: auto-spawn Ralph when task moves to review
   if (fields.status === 'review' && task) {

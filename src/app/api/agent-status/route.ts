@@ -18,7 +18,7 @@ export async function GET() {
     updated_at: string;
   }[];
 
-  // Merge with live session data — active sessions override status
+  // Sync with live session data on every read — server-side, no browser needed
   try {
     const res = await fetch('http://localhost:3001/api/sessions', { cache: 'no-store' });
     if (res.ok) {
@@ -29,6 +29,24 @@ export async function GET() {
           .filter(s => s.status === 'active')
           .map(s => s.agent_id === 'main' ? 'babbage' : s.agent_id)
       );
+      // Update DB: force idle for agents with no active session
+      for (const row of rows) {
+        const shouldBeWorking = activeAgentIds.has(row.agent_id);
+        const isWorking = row.status === 'working';
+        if (!shouldBeWorking && isWorking) {
+          db.prepare(
+            `UPDATE office_status SET status = 'idle', current_task = '', updated_at = datetime('now') WHERE agent_id = ?`
+          ).run(row.agent_id);
+          row.status = 'idle';
+          row.current_task = '';
+        } else if (shouldBeWorking && !isWorking) {
+          // Active session but DB says idle — mark working
+          db.prepare(
+            `UPDATE office_status SET status = 'working', updated_at = datetime('now') WHERE agent_id = ?`
+          ).run(row.agent_id);
+          row.status = 'working';
+        }
+      }
       return NextResponse.json(
         rows.map(row => ({
           ...row,
