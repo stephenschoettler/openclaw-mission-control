@@ -4,7 +4,7 @@ import "./globals.css";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { LayoutDashboard, CheckSquare, CalendarDays, FolderOpen, Users, Film, Zap, Inbox, Activity, Send, Monitor, DollarSign, LogOut, Puzzle, BarChart2, Menu, X } from "lucide-react";
+import { LayoutDashboard, CheckSquare, CalendarDays, FolderOpen, Users, Film, Zap, Inbox, Activity, Send, Monitor, DollarSign, LogOut, Puzzle, BarChart2, Menu, X, Server } from "lucide-react";
 
 const navGroups = [
   {
@@ -30,6 +30,7 @@ const navGroups = [
       { href: '/crons', label: 'Crons', icon: Zap },
       { href: '/costs', label: 'Costs', icon: DollarSign },
       { href: '/calendar', label: 'Calendar', icon: CalendarDays },
+      { href: '/system', label: 'System', icon: Server },
     ],
   },
   {

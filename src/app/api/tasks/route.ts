@@ -70,16 +70,19 @@ export async function PATCH(req: NextRequest) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { spawn, execSync } = require('child_process');
-      const home = process.env.HOME || '/home/w0lf';
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const fs = require('fs');
+      const home = '/home/w0lf';
       const openclawMjs = `${home}/dev/openclaw/openclaw.mjs`;
       let sha = 'unknown';
       try { sha = execSync(`git -C ${home}/mission-control rev-parse --short HEAD`, { encoding: 'utf8' }).trim(); } catch { /* ignore */ }
       const message = `QA review of commit ${sha} in ~/mission-control. Task: "${task.title}". Check what changed in the most recent commit. title_match: "${task.title}". Return APPROVED ✅ or REJECTED ❌.`;
+      const out = fs.openSync('/tmp/ralph-spawn.log', 'a');
       const proc = spawn('node', [openclawMjs, 'agent', '--agent', 'ralph', '--message', message], {
         detached: true,
-        stdio: 'ignore',
+        stdio: ['ignore', out, out],
         cwd: home,
-        env: { ...process.env }
+        env: { ...process.env, HOME: home }
       });
       proc.unref();
     } catch (e) {

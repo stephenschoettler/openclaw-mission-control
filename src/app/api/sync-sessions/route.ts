@@ -16,7 +16,6 @@ export async function POST() {
 
     const sessions: SessionData[] = await res.json();
 
-    // Build map: normalized agent_id → { agent_name, hasActive }
     const agentMap = new Map<string, { agent_name: string; hasActive: boolean }>();
 
     for (const s of sessions) {
@@ -43,6 +42,15 @@ export async function POST() {
     for (const agent_id of Array.from(agentMap.keys())) {
       const { agent_name, hasActive } = agentMap.get(agent_id)!;
       upsert.run(agent_id, agent_name, hasActive ? 'working' : 'idle');
+    }
+
+    // Force-idle any agent marked 'working' that has no active session
+    const activeIds = Array.from(agentMap.keys());
+    if (activeIds.length > 0) {
+      const placeholders = activeIds.map(() => '?').join(',');
+      (db.prepare(`UPDATE office_status SET status = 'idle', updated_at = datetime('now') WHERE status = 'working' AND agent_id NOT IN (${placeholders})`) as any).run(...activeIds);
+    } else {
+      db.prepare(`UPDATE office_status SET status = 'idle', updated_at = datetime('now') WHERE status = 'working'`).run();
     }
 
     return NextResponse.json({ ok: true, synced: agentMap.size });
