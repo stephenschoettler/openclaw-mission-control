@@ -13,7 +13,7 @@ const ALLOWED_DIRS = [
 
 function isAllowed(filePath: string): boolean {
   const resolved = path.resolve(filePath);
-  return ALLOWED_DIRS.some(dir => resolved.startsWith(dir + path.sep) || resolved.startsWith(dir));
+  return ALLOWED_DIRS.some(dir => resolved === dir || resolved.startsWith(dir + path.sep));
 }
 
 const MIME_TYPES: Record<string, string> = {
