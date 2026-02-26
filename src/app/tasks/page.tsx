@@ -433,7 +433,7 @@ export default function TasksPage() {
           </div>
 
           {/* RIGHT — Done column */}
-          <div className="w-56 flex-shrink-0">
+          <div className="w-80 flex-shrink-0">
             <div className="card p-4 h-full flex flex-col">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-2 h-2 rounded-full bg-green-400" />
@@ -469,7 +469,7 @@ export default function TasksPage() {
                                 <div className="flex items-start gap-1.5">
                                   <div className="w-1.5 h-1.5 rounded-full bg-green-500/60 mt-1 flex-shrink-0" />
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-xs text-neutral-400 line-clamp-2 leading-snug">{task.title}</p>
+                                    <p className="text-sm text-neutral-300 line-clamp-2 leading-snug">{task.title}</p>
                                     <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                                       <span className={`text-[9px] font-semibold px-1 py-0.5 rounded-full ${assigneeColor(task.assignee)}`}>{task.assignee}</span>
                                       <span className="text-[10px] text-neutral-600">{timeAgo(task.updated_at || task.created_at)}</span>
