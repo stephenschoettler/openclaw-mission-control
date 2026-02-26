@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { FolderOpen, File, FileText, Trash2, Upload, ChevronRight, X, Edit3, Eye, Folder, Code, FileJson, FileType, Terminal } from 'lucide-react';
+import { FolderOpen, File, FileText, Trash2, Upload, ChevronRight, X, Edit3, Eye, Folder, Code, FileJson, FileType, Terminal, Image as ImageIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 const HOME = '/home/w0lf';
@@ -51,7 +51,18 @@ const TEXT_EXTENSIONS = new Set([
   'toml', 'env', 'csv', 'html', 'css', 'xml', 'log', 'conf', 'ini', 'gitignore', 'lock',
 ]);
 
+const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg']);
+
+function isImage(ext: string) {
+  return IMAGE_EXTENSIONS.has(ext.toLowerCase());
+}
+
+function imageUrl(filePath: string) {
+  return `/api/files/image?path=${encodeURIComponent(filePath)}`;
+}
+
 function getFileIcon(ext: string) {
+  if (IMAGE_EXTENSIONS.has(ext)) return <ImageIcon size={14} className="text-pink-400" />;
   if (ext === 'md' || ext === 'txt') return <FileText size={14} className="text-indigo-400" />;
   if (ext === 'json') return <FileJson size={14} className="text-yellow-400" />;
   if (['ts', 'tsx', 'js', 'jsx', 'py'].includes(ext)) return <Code size={14} className="text-green-400" />;
@@ -80,6 +91,55 @@ function formatDate(dateStr: string): string {
   return d.toLocaleDateString();
 }
 
+// Lightbox modal for full-size image preview
+function ImageLightbox({ entry, onClose }: { entry: FileEntry; onClose: () => void }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center"
+      onClick={onClose}
+    >
+      {/* Header */}
+      <div
+        className="absolute top-0 left-0 right-0 flex items-center justify-between px-6 py-4 bg-gradient-to-b from-black/60 to-transparent"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex flex-col gap-0.5">
+          <span className="text-white font-semibold text-sm">{entry.name}</span>
+          <span className="text-neutral-400 text-[11px] font-mono truncate max-w-[60vw]">{entry.path}</span>
+        </div>
+        <button
+          onClick={onClose}
+          className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+        >
+          <X size={18} />
+        </button>
+      </div>
+
+      {/* Image */}
+      <div
+        className="max-w-[90vw] max-h-[80vh] flex items-center justify-center"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={imageUrl(entry.path)}
+          alt={entry.name}
+          className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl"
+        />
+      </div>
+
+      {/* Footer hint */}
+      <p className="absolute bottom-6 text-neutral-600 text-[11px]">Click outside or press Esc to close</p>
+    </div>
+  );
+}
+
 export default function FilesPage() {
   const [currentPath, setCurrentPath] = useState(`${HOME}/.openclaw/memory`);
   const [entries, setEntries] = useState<FileEntry[]>([]);
@@ -91,6 +151,7 @@ export default function FilesPage() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [contentLoading, setContentLoading] = useState(false);
+  const [lightboxEntry, setLightboxEntry] = useState<FileEntry | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeWorkspace = WORKSPACES.find(w =>
@@ -123,6 +184,12 @@ export default function FilesPage() {
   };
 
   const openFile = async (entry: FileEntry) => {
+    // Images → open lightbox directly
+    if (isImage(entry.ext)) {
+      setLightboxEntry(entry);
+      return;
+    }
+
     setSelectedFile(entry);
     setEditMode(false);
     setSaveStatus('idle');
@@ -321,10 +388,26 @@ export default function FilesPage() {
                   >
                     <td className="py-2 px-4">
                       <div className="flex items-center gap-2.5">
-                        {entry.type === 'dir'
-                          ? <Folder size={14} className="text-indigo-400 shrink-0" />
-                          : getFileIcon(entry.ext)
-                        }
+                        {entry.type === 'dir' ? (
+                          <Folder size={14} className="text-indigo-400 shrink-0" />
+                        ) : isImage(entry.ext) ? (
+                          /* Image thumbnail */
+                          <div className="w-12 h-12 rounded-md overflow-hidden bg-white/[0.04] border border-white/[0.06] shrink-0 flex items-center justify-center">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={imageUrl(entry.path)}
+                              alt={entry.name}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                              onError={e => {
+                                (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                (e.currentTarget.parentElement as HTMLElement).innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-pink-400"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>';
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          getFileIcon(entry.ext)
+                        )}
                         <span className="text-[13px] text-white truncate">{entry.name}</span>
                       </div>
                     </td>
@@ -538,6 +621,11 @@ export default function FilesPage() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Image Lightbox */}
+      {lightboxEntry && (
+        <ImageLightbox entry={lightboxEntry} onClose={() => setLightboxEntry(null)} />
       )}
     </div>
   );
