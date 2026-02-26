@@ -103,7 +103,7 @@ export default function TasksPage() {
     setShowForm(true);
   };
 
-  const filteredTasks = activeFilter === 'All' ? tasks : tasks.filter(t => t.assignee === activeFilter);
+  const filteredTasks = activeFilter === 'All' ? tasks : tasks.filter(t => t.assignee.toLowerCase() === activeFilter.toLowerCase());
 
   const inProgress = tasks.filter(t => t.status === 'in-progress').length;
   const done = tasks.filter(t => t.status === 'done').length;

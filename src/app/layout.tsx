@@ -4,11 +4,12 @@ import "./globals.css";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { LayoutDashboard, CheckSquare, CalendarDays, FolderOpen, Users, Film, Building2, Zap, Inbox, Activity, Send, Monitor, DollarSign, LogOut, Puzzle } from "lucide-react";
+import { LayoutDashboard, CheckSquare, CalendarDays, FolderOpen, Users, Film, Building2, Zap, Inbox, Activity, Send, Monitor, DollarSign, LogOut, Puzzle, BarChart2 } from "lucide-react";
 
 const navItems = [
   { href: '/', label: 'Overview', icon: LayoutDashboard, exact: true },
   { href: '/tasks', label: 'Tasks', icon: CheckSquare },
+  { href: '/analytics', label: 'Analytics', icon: BarChart2 },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays },
   { href: '/sessions', label: 'Sessions', icon: Monitor },
   { href: '/crons', label: 'Crons', icon: Zap },
