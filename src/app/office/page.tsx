@@ -10,12 +10,32 @@ interface OfficeStation {
   role: string;
   current_task: string;
   status: string;
+  updated_at: string;
 }
 
 interface Agent {
   id: string;
   name: string;
   model?: string;
+}
+
+// Sub-agents hidden unless actively working
+const SUB_AGENT_IDS = new Set([
+  'code-frontend', 'code-backend', 'code-devops',
+  'answring-ops', 'answring-dev', 'answring-marketing',
+  'answring-security', 'answring-strategist', 'answring-sales',
+]);
+
+function parseUtc(dateStr: string): Date {
+  const iso = dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T') + 'Z';
+  return new Date(iso);
+}
+
+/** Resolve display status — stale "working" (>10 min) → "idle" */
+function resolveStatus(status: string, updatedAt: string): string {
+  if (status !== 'working') return status;
+  const ageMs = Date.now() - parseUtc(updatedAt).getTime();
+  return ageMs > 10 * 60 * 1000 ? 'idle' : 'working';
 }
 
 const STATUS_CYCLE = ['working', 'idle', 'offline'] as const;
@@ -103,8 +123,21 @@ export default function OfficePage() {
     fetchData();
   };
 
-  const workingCount = stations.filter(s => s.status === 'working').length;
-  const idleCount = stations.filter(s => s.status === 'idle').length;
+  // Apply stale-status and tier logic
+  const resolvedStations = stations.map(s => ({
+    ...s,
+    displayStatus: resolveStatus(s.status, s.updated_at),
+  }));
+  // Top-level agents always shown; sub-agents only shown if working
+  const visibleStations = resolvedStations.filter(s =>
+    !SUB_AGENT_IDS.has(s.agent_id) || s.displayStatus === 'working'
+  );
+  const hiddenSubAgents = resolvedStations.filter(s =>
+    SUB_AGENT_IDS.has(s.agent_id) && s.displayStatus !== 'working'
+  );
+
+  const workingCount = visibleStations.filter(s => s.displayStatus === 'working').length;
+  const idleCount = visibleStations.filter(s => s.displayStatus === 'idle').length;
 
   return (
     <div>
@@ -147,13 +180,19 @@ export default function OfficePage() {
           <span className="text-xs text-neutral-500">Idle</span>
         </div>
         <div className="flex items-baseline gap-1.5">
-          <span className="text-xl font-bold text-white">{stations.length}</span>
+          <span className="text-xl font-bold text-white">{visibleStations.length}</span>
           <span className="text-xs text-neutral-500">Total</span>
         </div>
+        {hiddenSubAgents.length > 0 && (
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-xl font-bold text-neutral-600">{hiddenSubAgents.length}</span>
+            <span className="text-xs text-neutral-700">Workers idle</span>
+          </div>
+        )}
       </div>
 
       {/* Floor Plan */}
-      {stations.length === 0 && agents.length === 0 ? (
+      {visibleStations.length === 0 && agents.length === 0 ? (
         <div className="card p-12 text-center">
           <Building2 size={32} className="text-neutral-600 mx-auto mb-3" />
           <p className="text-sm text-neutral-500">No agents configured yet</p>
@@ -164,8 +203,8 @@ export default function OfficePage() {
           className="grid gap-3"
           style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}
         >
-          {stations.map(station => {
-            const cfg = statusConfig[station.status] || statusConfig.idle;
+          {visibleStations.map(station => {
+            const cfg = statusConfig[station.displayStatus] || statusConfig.idle;
             const emoji = getEmoji(station.agent_id, station.agent_name);
             const isHovered = hoveredDesk === station.agent_id;
 
@@ -174,7 +213,7 @@ export default function OfficePage() {
                 key={station.agent_id}
                 onMouseEnter={() => setHoveredDesk(station.agent_id)}
                 onMouseLeave={() => setHoveredDesk(null)}
-                className={`relative rounded-xl border p-4 transition-all duration-200 cursor-default ${cfg.deskBg} ${cfg.deskBorder} ${station.status === 'working' ? 'shadow-[0_0_16px_0_rgba(34,197,94,0.12)]' : ''}`}
+                className={`relative rounded-xl border p-4 transition-all duration-200 cursor-default ${cfg.deskBg} ${cfg.deskBorder} ${station.displayStatus === 'working' ? 'shadow-[0_0_16px_0_rgba(34,197,94,0.12)]' : ''}`}
               >
                 {/* Desk label (top-right) */}
                 <div className="absolute top-2 right-2">

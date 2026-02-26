@@ -84,6 +84,13 @@ function parseUtc(dateStr: string): Date {
   return new Date(iso);
 }
 
+/** If an agent is "working" but updated_at is >10 min old, treat as idle in UI */
+function resolveStatus(status: string, updatedAt: string): string {
+  if (status !== 'working') return status;
+  const ageMs = Date.now() - parseUtc(updatedAt).getTime();
+  return ageMs > 10 * 60 * 1000 ? 'idle' : 'working';
+}
+
 function relativeTime(dateStr: string): string {
   const diff = Date.now() - parseUtc(dateStr).getTime();
   const s = Math.floor(diff / 1000);
@@ -162,7 +169,7 @@ export default function CommandCenterPage() {
     return () => clearInterval(id);
   }, [fetchAll]);
 
-  const workingAgents = stations.filter(s => s.status === 'working');
+  const workingAgents = stations.filter(s => resolveStatus(s.status, s.updated_at) === 'working');
   const taskCounts = {
     todo: tasks.filter(t => t.status === 'backlog').length,
     inProgress: tasks.filter(t => t.status === 'in-progress').length,

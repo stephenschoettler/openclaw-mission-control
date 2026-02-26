@@ -9,7 +9,12 @@ export async function POST(req: NextRequest) {
     current_task?: string;
   };
 
-  const { agent_id, agent_name, status, current_task = '' } = body;
+  // Normalize "main" → "babbage" so duplicate rows never appear
+  const normalizedId = body.agent_id === 'main' ? 'babbage' : body.agent_id;
+  const normalizedName = (normalizedId === 'babbage') ? 'Babbage' : body.agent_name;
+  const agent_id = normalizedId;
+  const agent_name = normalizedName;
+  const { status, current_task = '' } = body;
 
   if (!agent_id || !agent_name || !status) {
     return NextResponse.json({ error: 'Missing required fields: agent_id, agent_name, status' }, { status: 400 });
