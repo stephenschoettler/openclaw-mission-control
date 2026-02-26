@@ -1,14 +1,18 @@
 import { NextResponse } from 'next/server';
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
 
 export async function GET() {
-  try {
-    const logs = execSync('journalctl --user -u openclaw-gateway -n 50 --no-pager', {
-      timeout: 5000,
-      encoding: 'utf8',
+  return new Promise<NextResponse>((resolve) => {
+    const child = exec(
+      'journalctl --user -u openclaw-gateway -n 50 --no-pager',
+      { timeout: 5000 },
+      (error, stdout, stderr) => {
+        const logs = stdout.trim() || stderr.trim() || (error ? `Error: ${String(error)}` : '');
+        resolve(NextResponse.json({ logs, timestamp: new Date().toISOString() }));
+      }
+    );
+    child.on('error', (err) => {
+      resolve(NextResponse.json({ logs: `Error: ${String(err)}`, timestamp: new Date().toISOString() }));
     });
-    return NextResponse.json({ logs: logs.trim(), timestamp: new Date().toISOString() });
-  } catch (e: unknown) {
-    return NextResponse.json({ logs: `Error fetching logs: ${String(e)}`, timestamp: new Date().toISOString() });
-  }
+  });
 }

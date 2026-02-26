@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server';
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
 import path from 'path';
+import os from 'os';
 
 export async function GET() {
-  try {
-    const ocPath = path.join(process.env.HOME || '/home/w0lf', 'dev/openclaw/openclaw.mjs');
-    const output = execSync(`node ${ocPath} doctor`, { timeout: 5000, encoding: 'utf8' });
-    return NextResponse.json({ output: output.trim(), timestamp: new Date().toISOString() });
-  } catch (e: unknown) {
-    const err = e as { stdout?: string; stderr?: string };
-    const output = (err.stdout || '') + (err.stderr || '') || String(e);
-    return NextResponse.json({ output: output.trim(), timestamp: new Date().toISOString() });
-  }
+  const ocPath = path.join(os.homedir(), 'dev/openclaw/openclaw.mjs');
+  return new Promise<NextResponse>((resolve) => {
+    const child = exec(`node ${ocPath} doctor`, { timeout: 5000 }, (error, stdout, stderr) => {
+      const output = (stdout + stderr).trim() || (error ? String(error) : 'No output');
+      resolve(NextResponse.json({ output, timestamp: new Date().toISOString() }));
+    });
+    child.on('error', (err) => {
+      resolve(NextResponse.json({ output: String(err), timestamp: new Date().toISOString() }));
+    });
+  });
 }
