@@ -52,10 +52,10 @@ export async function GET() {
 
     let updated;
     if (isRejected) {
-      // Move all tasks in 'review' → 'in-progress', increment rejection_count
+      // Move all tasks in 'review' → 'backlog', increment rejection_count
       updated = db.prepare(`
         UPDATE tasks
-        SET status = 'in-progress', rejection_count = rejection_count + 1, updated_at = datetime('now')
+        SET status = 'backlog', rejection_count = rejection_count + 1, updated_at = datetime('now')
         WHERE status = 'review'
       `).run();
     } else {
@@ -69,7 +69,7 @@ export async function GET() {
 
     if (updated.changes > 0) {
       if (isRejected) {
-        results.push(`Ralph REJECTED: moved ${updated.changes} review task(s) back to in-progress`);
+        results.push(`Ralph REJECTED: moved ${updated.changes} review task(s) to backlog`);
       } else {
         results.push(`Moved ${updated.changes} review task(s) to done`);
       }
@@ -81,7 +81,7 @@ export async function GET() {
         const memPath = `${memDir}/${date}.md`;
         fs.mkdirSync(memDir, { recursive: true });
         const memEntry = isRejected
-          ? `\n- ❌ Ralph rejected: ${updated.changes} task(s) moved back to in-progress (${date})\n`
+          ? `\n- ❌ Ralph rejected: ${updated.changes} task(s) moved to backlog (${date})\n`
           : `\n- ✅ Ralph approved: ${updated.changes} task(s) moved to done (${date})\n`;
         fs.appendFileSync(memPath, memEntry, 'utf8');
       } catch { /* never block */ }
