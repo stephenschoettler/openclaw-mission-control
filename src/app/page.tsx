@@ -285,7 +285,7 @@ export default function CommandCenterPage() {
       {/* Middle row: Approvals + Activity + Events */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         {/* Pending Approvals */}
-        <div className="card p-5 shimmer-hover">
+        <div className="card p-5 shimmer-hover relative overflow-hidden">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-white flex items-center gap-2">
               <Inbox size={14} className="text-amber-400" />
