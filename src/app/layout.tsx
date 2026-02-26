@@ -4,7 +4,7 @@ import "./globals.css";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { LayoutDashboard, CheckSquare, CalendarDays, Brain, Users, Film, Building2, Zap, Inbox, Activity, Send, Monitor, DollarSign, LogOut } from "lucide-react";
+import { LayoutDashboard, CheckSquare, CalendarDays, Brain, Users, Film, Building2, Zap, Inbox, Activity, Send, Monitor, DollarSign, LogOut, Puzzle } from "lucide-react";
 
 const navItems = [
   { href: '/', label: 'Overview', icon: LayoutDashboard, exact: true },
@@ -19,6 +19,7 @@ const navItems = [
   { href: '/team', label: 'Team', icon: Users },
   { href: '/activity', label: 'Activity', icon: Activity },
   { href: '/content', label: 'Content', icon: Film },
+  { href: '/skills', label: 'Skills', icon: Puzzle },
 ];
 
 function LiveClock() {
