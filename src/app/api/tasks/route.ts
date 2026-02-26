@@ -35,7 +35,22 @@ export async function PATCH(req: NextRequest) {
   if (sets) {
     db.prepare(`UPDATE tasks SET ${sets}, updated_at = datetime('now') WHERE id = ?`).run(...vals, resolvedId);
   }
-  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(resolvedId);
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(resolvedId) as { title: string; assignee: string; status: string } | undefined;
+
+  // Fire-and-forget: append to today's memory file
+  if (fields.status === 'done' && task) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const fs = require('fs');
+      const date = new Date().toISOString().slice(0, 10);
+      const memDir = '/home/w0lf/.openclaw/workspace/memory';
+      const memPath = `${memDir}/${date}.md`;
+      const line = `\n- ✅ Task completed: "${task.title}" (assigned: ${task.assignee}, ${date})\n`;
+      fs.mkdirSync(memDir, { recursive: true });
+      fs.appendFileSync(memPath, line, 'utf8');
+    } catch { /* never block the response */ }
+  }
+
   return NextResponse.json(task);
 }
 

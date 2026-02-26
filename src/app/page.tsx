@@ -40,6 +40,7 @@ interface CalendarEvent {
 interface Task {
   id: number;
   status: string;
+  updated_at: string;
 }
 
 interface GatewayInfo {
@@ -169,6 +170,8 @@ export default function CommandCenterPage() {
   };
   const totalTasks = tasks.length;
   const donePercent = totalTasks > 0 ? Math.round((taskCounts.done / totalTasks) * 100) : 0;
+  const todayUtc = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+  const doneToday = tasks.filter(t => t.status === 'done' && t.updated_at && t.updated_at.slice(0, 10) === todayUtc).length;
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -421,7 +424,7 @@ export default function CommandCenterPage() {
       </div>
 
       {/* Bottom: Quick stats */}
-      <div className="grid grid-cols-5 gap-3">
+      <div className="grid grid-cols-6 gap-3">
         <div className="card p-4 shimmer-hover relative overflow-hidden">
           <div className="flex items-center gap-2 mb-2.5">
             <div className="w-8 h-8 rounded-lg bg-indigo-500/15 flex items-center justify-center shrink-0">
@@ -458,7 +461,18 @@ export default function CommandCenterPage() {
         <div className="card p-4 shimmer-hover relative overflow-hidden">
           <div className="flex items-center gap-2 mb-2.5">
             <div className="w-8 h-8 rounded-lg bg-green-500/15 flex items-center justify-center shrink-0">
-              <TrendingUp size={15} className="text-green-400" />
+              <CheckSquare size={15} className="text-green-400" />
+            </div>
+            <span className="text-[11px] text-neutral-500 font-semibold tracking-wide">Done Today</span>
+          </div>
+          <p className={`text-2xl font-extrabold ${doneToday === 0 ? 'text-neutral-600' : 'text-green-400'}`}>{doneToday}</p>
+          <p className="text-[10px] text-neutral-600 mt-0.5">completed today</p>
+        </div>
+
+        <div className="card p-4 shimmer-hover relative overflow-hidden">
+          <div className="flex items-center gap-2 mb-2.5">
+            <div className="w-8 h-8 rounded-lg bg-indigo-500/15 flex items-center justify-center shrink-0">
+              <TrendingUp size={15} className="text-indigo-400" />
             </div>
             <span className="text-[11px] text-neutral-500 font-semibold tracking-wide">Completion</span>
           </div>
