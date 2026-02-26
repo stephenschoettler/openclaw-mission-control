@@ -198,17 +198,6 @@ const LAYERS: Layer[] = [
   },
 ];
 
-const STATUS_COLORS: Record<string, { dot: string; label: string; pulse: boolean; cardBorder: string }> = {
-  working: { dot: 'bg-green-400', label: 'Working', pulse: true, cardBorder: 'border-green-500/30' },
-  active:  { dot: 'bg-green-400', label: 'Active',  pulse: true, cardBorder: 'border-green-500/30' },
-  idle:    { dot: 'bg-yellow-400', label: 'Idle',   pulse: false, cardBorder: 'border-white/[0.08]' },
-  offline: { dot: 'bg-neutral-600', label: 'Offline', pulse: false, cardBorder: 'border-white/[0.04]' },
-};
-
-function getStatusCfg(status: string) {
-  return STATUS_COLORS[status] ?? STATUS_COLORS.idle;
-}
-
 function parseUtc(dateStr: string): Date {
   const iso = dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T') + 'Z';
   return new Date(iso);
@@ -230,33 +219,49 @@ function AgentCard({
   status: string;
   currentTask?: string;
 }) {
-  const cfg = getStatusCfg(status);
   const isWorking = status === 'working' || status === 'active';
+  const isIdle = status === 'idle';
+  const isOffline = !isWorking && !isIdle;
+
+  const cardClasses = isWorking
+    ? 'card p-4 flex flex-col gap-2.5 border border-green-500/40 bg-green-950/20 shadow-[0_0_15px_rgba(74,222,128,0.3)] transition-all duration-300'
+    : isIdle
+    ? 'card p-4 flex flex-col gap-2.5 border border-white/[0.06] opacity-60 transition-all duration-300'
+    : 'card p-4 flex flex-col gap-2.5 border border-white/[0.04] opacity-35 grayscale transition-all duration-300';
 
   return (
-    <div
-      className={`card p-4 flex flex-col gap-2.5 border ${cfg.cardBorder} ${isWorking ? 'shadow-[0_0_16px_0_rgba(34,197,94,0.10)]' : ''} transition-all duration-200`}
-    >
+    <div className={cardClasses}>
       <div className="flex items-start gap-3">
+        {/* Avatar with pulse ring for working agents */}
         <div className="relative flex-shrink-0">
-          <div className="w-12 h-12 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-2xl">
+          {isWorking && (
+            <span className="absolute inset-0 rounded-xl animate-ping bg-green-400/20 pointer-events-none" />
+          )}
+          <div className="relative w-12 h-12 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-2xl z-10">
             {agent.emoji}
           </div>
-          <div
-            className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#0a0a0f] ${cfg.dot} ${cfg.pulse ? 'pulse-dot' : ''}`}
-            title={cfg.label}
-          />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-white truncate">{agent.name}</p>
-          <p className="text-[11px] text-neutral-500 mt-0.5 leading-tight">{agent.title}</p>
-          {isWorking && currentTask && (
-            <p className="text-[10px] text-green-400 mt-1 truncate leading-tight" title={currentTask}>
-              ↳ {currentTask}
-            </p>
+          {/* LIVE badge for working agents, dot for others */}
+          {isWorking ? (
+            <span className="absolute -bottom-1 -right-1 z-20 text-[9px] font-black bg-green-500 text-black px-1 py-0.5 rounded leading-none tracking-wide uppercase">
+              LIVE
+            </span>
+          ) : (
+            <div
+              className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#0a0a0f] z-20 ${isIdle ? 'bg-yellow-400' : 'bg-neutral-600'}`}
+              title={isIdle ? 'Idle' : 'Offline'}
+            />
           )}
         </div>
+
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm font-bold truncate ${isWorking ? 'text-white' : 'text-white/80'}`}>
+            {agent.name}
+          </p>
+          <p className="text-[11px] text-neutral-500 mt-0.5 leading-tight">{agent.title}</p>
+        </div>
       </div>
+
+      {/* Tags */}
       <div className="flex flex-wrap gap-1">
         {agent.tags.map(tag => (
           <span
@@ -267,6 +272,19 @@ function AgentCard({
           </span>
         ))}
       </div>
+
+      {/* Current task strip — only for working agents */}
+      {isWorking && currentTask && (
+        <div className="mt-auto pt-2 border-t border-green-500/20">
+          <div className="flex items-center gap-1.5 bg-green-950/40 rounded-md px-2 py-1.5">
+            <span className="text-green-400/60 text-[10px] font-bold uppercase tracking-wide flex-shrink-0">task</span>
+            <p className="text-[10px] text-green-300 truncate leading-tight flex-1" title={currentTask}>
+              {currentTask}
+            </p>
+            <span className="inline-block w-1.5 h-3 bg-green-400 animate-pulse flex-shrink-0 rounded-sm" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -332,9 +350,10 @@ export default function TeamPage() {
           </div>
         </div>
         <div className="flex items-center gap-5">
-          <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-green-400 pulse-dot" />
-            <span className="text-[10px] text-neutral-500">{activeCount} Working</span>
+          {/* Live agents counter */}
+          <div className="flex items-center gap-2 bg-green-950/40 border border-green-500/30 rounded-lg px-3 py-1.5 shadow-[0_0_10px_rgba(74,222,128,0.15)]">
+            <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse flex-shrink-0" />
+            <span className="text-sm font-black text-green-400">{activeCount} LIVE</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-2 h-2 rounded-full bg-yellow-400" />
