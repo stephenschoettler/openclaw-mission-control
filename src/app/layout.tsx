@@ -208,7 +208,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="block px-5 pt-5 pb-4 group">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold">
-                  MC
+                  🚀
                 </div>
                 <div>
                   <h1 className="text-sm font-bold text-white tracking-tight">Mission Control</h1>
