@@ -4,7 +4,7 @@ import "./globals.css";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { LayoutDashboard, CheckSquare, CalendarDays, FolderOpen, Users, Film, Building2, Zap, Inbox, Activity, Send, Monitor, DollarSign, LogOut, Puzzle, BarChart2 } from "lucide-react";
+import { LayoutDashboard, CheckSquare, CalendarDays, FolderOpen, Users, Film, Zap, Inbox, Activity, Send, Monitor, DollarSign, LogOut, Puzzle, BarChart2 } from "lucide-react";
 
 const navItems = [
   { href: '/', label: 'Overview', icon: LayoutDashboard, exact: true },
@@ -16,7 +16,6 @@ const navItems = [
   { href: '/costs', label: 'Costs', icon: DollarSign },
   { href: '/approvals', label: 'Approvals', icon: Inbox },
   { href: '/files', label: 'Files', icon: FolderOpen },
-  { href: '/office', label: 'Office', icon: Building2 },
   { href: '/team', label: 'Team', icon: Users },
   { href: '/activity', label: 'Activity', icon: Activity },
   { href: '/content', label: 'Content', icon: Film },

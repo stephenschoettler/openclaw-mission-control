@@ -5,7 +5,10 @@ import { Users } from 'lucide-react';
 
 interface OfficeStation {
   agent_id: string;
+  agent_name: string;
   status: string;
+  current_task: string;
+  updated_at: string;
 }
 
 interface AgentMeta {
@@ -21,6 +24,13 @@ interface Layer {
   color: string;
   agents: AgentMeta[];
 }
+
+// Sub-agents hidden unless actively working
+const SUB_AGENT_IDS = new Set([
+  'code-frontend', 'code-backend', 'code-devops',
+  'answring-ops', 'answring-dev', 'answring-marketing',
+  'answring-security', 'answring-strategist', 'answring-sales',
+]);
 
 const LAYERS: Layer[] = [
   {
@@ -188,21 +198,45 @@ const LAYERS: Layer[] = [
   },
 ];
 
-const STATUS_COLORS: Record<string, { dot: string; label: string; pulse: boolean }> = {
-  working: { dot: 'bg-green-400', label: 'Active', pulse: true },
-  active: { dot: 'bg-green-400', label: 'Active', pulse: true },
-  idle: { dot: 'bg-yellow-400', label: 'Idle', pulse: false },
-  offline: { dot: 'bg-neutral-600', label: 'Offline', pulse: false },
+const STATUS_COLORS: Record<string, { dot: string; label: string; pulse: boolean; cardBorder: string }> = {
+  working: { dot: 'bg-green-400', label: 'Working', pulse: true, cardBorder: 'border-green-500/30' },
+  active:  { dot: 'bg-green-400', label: 'Active',  pulse: true, cardBorder: 'border-green-500/30' },
+  idle:    { dot: 'bg-yellow-400', label: 'Idle',   pulse: false, cardBorder: 'border-white/[0.08]' },
+  offline: { dot: 'bg-neutral-600', label: 'Offline', pulse: false, cardBorder: 'border-white/[0.04]' },
 };
 
 function getStatusCfg(status: string) {
   return STATUS_COLORS[status] ?? STATUS_COLORS.idle;
 }
 
-function AgentCard({ agent, status }: { agent: AgentMeta; status: string }) {
+function parseUtc(dateStr: string): Date {
+  const iso = dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T') + 'Z';
+  return new Date(iso);
+}
+
+/** Resolve display status — stale "working" (>10 min) → "idle" */
+function resolveStatus(status: string, updatedAt: string): string {
+  if (status !== 'working') return status;
+  const ageMs = Date.now() - parseUtc(updatedAt).getTime();
+  return ageMs > 10 * 60 * 1000 ? 'idle' : 'working';
+}
+
+function AgentCard({
+  agent,
+  status,
+  currentTask,
+}: {
+  agent: AgentMeta;
+  status: string;
+  currentTask?: string;
+}) {
   const cfg = getStatusCfg(status);
+  const isWorking = status === 'working' || status === 'active';
+
   return (
-    <div className="card card-glow p-4 flex flex-col gap-2.5">
+    <div
+      className={`card p-4 flex flex-col gap-2.5 border ${cfg.cardBorder} ${isWorking ? 'shadow-[0_0_16px_0_rgba(34,197,94,0.10)]' : ''} transition-all duration-200`}
+    >
       <div className="flex items-start gap-3">
         <div className="relative flex-shrink-0">
           <div className="w-12 h-12 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-2xl">
@@ -210,11 +244,17 @@ function AgentCard({ agent, status }: { agent: AgentMeta; status: string }) {
           </div>
           <div
             className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#0a0a0f] ${cfg.dot} ${cfg.pulse ? 'pulse-dot' : ''}`}
+            title={cfg.label}
           />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-white truncate">{agent.name}</p>
           <p className="text-[11px] text-neutral-500 mt-0.5 leading-tight">{agent.title}</p>
+          {isWorking && currentTask && (
+            <p className="text-[10px] text-green-400 mt-1 truncate leading-tight" title={currentTask}>
+              ↳ {currentTask}
+            </p>
+          )}
         </div>
       </div>
       <div className="flex flex-wrap gap-1">
@@ -240,25 +280,43 @@ export default function TeamPage() {
       const data: OfficeStation[] = await res.json();
       setStations(data);
     } catch {
-      // silently fail — status dots will show idle
+      // silently fail — status dots show idle
     }
   }, []);
 
   useEffect(() => { fetchStations(); }, [fetchStations]);
   useEffect(() => {
-    const id = setInterval(fetchStations, 30000);
+    const id = setInterval(fetchStations, 15000);
     return () => clearInterval(id);
   }, [fetchStations]);
 
-  const getStatus = (agentId: string): string => {
-    if (agentId === 'sir') return 'active';
+  const getStationInfo = (agentId: string): { status: string; currentTask?: string } => {
+    if (agentId === 'sir') return { status: 'active' };
     const s = stations.find(st => st.agent_id === agentId);
-    return s?.status ?? 'idle';
+    if (!s) return { status: 'idle' };
+    const resolved = resolveStatus(s.status, s.updated_at ?? new Date().toISOString());
+    return { status: resolved, currentTask: s.current_task || undefined };
   };
 
-  const totalAgents = LAYERS.reduce((sum, l) => sum + l.agents.length, 0);
-  const activeCount = LAYERS.flatMap(l => l.agents)
-    .filter(a => ['working', 'active'].includes(getStatus(a.id))).length;
+  // Flatten all agents, respecting sub-agent visibility rules
+  const allAgents = LAYERS.flatMap(l => l.agents);
+  const visibleAgentIds = new Set(
+    allAgents
+      .filter(a => {
+        if (!SUB_AGENT_IDS.has(a.id)) return true;
+        const { status } = getStationInfo(a.id);
+        return status === 'working';
+      })
+      .map(a => a.id)
+  );
+
+  const totalAgents = allAgents.filter(a => visibleAgentIds.has(a.id)).length;
+  const activeCount = allAgents
+    .filter(a => visibleAgentIds.has(a.id))
+    .filter(a => ['working', 'active'].includes(getStationInfo(a.id).status)).length;
+  const idleCount = allAgents
+    .filter(a => visibleAgentIds.has(a.id))
+    .filter(a => getStationInfo(a.id).status === 'idle').length;
 
   return (
     <div>
@@ -269,44 +327,55 @@ export default function TeamPage() {
             <Users size={16} className="text-indigo-400" />
           </div>
           <div>
-            <h2 className="text-2xl font-extrabold gradient-text tracking-tight">Agent Org Chart</h2>
-            <p className="text-xs text-neutral-500">Full fleet hierarchy by role layer</p>
+            <h2 className="text-2xl font-extrabold gradient-text tracking-tight">Agent Team</h2>
+            <p className="text-xs text-neutral-500">Fleet hierarchy · live status · 15s refresh</p>
           </div>
         </div>
         <div className="flex items-center gap-5">
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-green-400 pulse-dot" />
+            <span className="text-[10px] text-neutral-500">{activeCount} Working</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-yellow-400" />
+            <span className="text-[10px] text-neutral-500">{idleCount} Idle</span>
+          </div>
           <div className="flex items-baseline gap-1.5">
             <span className="text-xl font-bold text-white">{totalAgents}</span>
             <span className="text-xs text-neutral-500">Agents</span>
-          </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-xl font-bold text-green-400">{activeCount}</span>
-            <span className="text-xs text-neutral-500">Active</span>
           </div>
         </div>
       </div>
 
       {/* Layers */}
       <div className="space-y-8">
-        {LAYERS.map(layer => (
-          <div key={layer.label}>
-            {/* Layer divider */}
-            <div className="flex items-center gap-3 mb-4">
-              <div className={`w-2 h-2 rounded-full bg-gradient-to-br ${layer.color} flex-shrink-0`} />
-              <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-[0.15em]">
-                {layer.label}
-              </span>
-              <div className="flex-1 h-px bg-white/[0.06]" />
-              <span className="text-[10px] text-neutral-600">{layer.agents.length} agent{layer.agents.length !== 1 ? 's' : ''}</span>
-            </div>
+        {LAYERS.map(layer => {
+          const visibleAgents = layer.agents.filter(a => visibleAgentIds.has(a.id));
+          if (visibleAgents.length === 0) return null;
+          return (
+            <div key={layer.label}>
+              {/* Layer divider */}
+              <div className="flex items-center gap-3 mb-4">
+                <div className={`w-2 h-2 rounded-full bg-gradient-to-br ${layer.color} flex-shrink-0`} />
+                <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-[0.15em]">
+                  {layer.label}
+                </span>
+                <div className="flex-1 h-px bg-white/[0.06]" />
+                <span className="text-[10px] text-neutral-600">{visibleAgents.length} agent{visibleAgents.length !== 1 ? 's' : ''}</span>
+              </div>
 
-            {/* Agent cards grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
-              {layer.agents.map(agent => (
-                <AgentCard key={agent.id} agent={agent} status={getStatus(agent.id)} />
-              ))}
+              {/* Agent cards grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+                {visibleAgents.map(agent => {
+                  const { status, currentTask } = getStationInfo(agent.id);
+                  return (
+                    <AgentCard key={agent.id} agent={agent} status={status} currentTask={currentTask} />
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
