@@ -123,7 +123,7 @@ export default function SessionsPage() {
             <Monitor size={18} className="text-indigo-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-extrabold gradient-text tracking-tight">Active Sessions</h1>
+            <h2 className="text-2xl font-extrabold gradient-text tracking-tight">Active Sessions</h2>
             <p className="text-xs text-neutral-500 mt-0.5">Live agent context windows — auto-refreshes every 15s</p>
           </div>
         </div>

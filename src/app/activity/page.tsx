@@ -144,7 +144,7 @@ export default function ActivityPage() {
             <Activity size={18} className="text-indigo-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-extrabold gradient-text tracking-tight">Activity Feed</h1>
+            <h2 className="text-2xl font-extrabold gradient-text tracking-tight">Activity Feed</h2>
             <p className="text-xs text-neutral-500 mt-0.5">Live stream of agent events</p>
           </div>
         </div>

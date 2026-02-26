@@ -177,7 +177,7 @@ export default function CommandCenterPage() {
     <div className="max-w-6xl mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-br from-indigo-400 via-purple-400 to-fuchsia-400 bg-clip-text text-transparent">Command Center</h1>
+        <h2 className="text-2xl font-extrabold gradient-text tracking-tight">Overview</h2>
         <p className="text-sm text-neutral-500 mt-1">Live fleet status — refreshes every 15s</p>
       </div>
 

@@ -153,7 +153,7 @@ export default function CostsPage() {
             <DollarSign size={18} className="text-emerald-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-extrabold gradient-text tracking-tight">Token Costs</h1>
+            <h2 className="text-2xl font-extrabold gradient-text tracking-tight">Token Costs</h2>
             <p className="text-xs text-neutral-500 mt-0.5">Usage and spend across all agents — refreshes every 60s</p>
           </div>
         </div>

@@ -66,7 +66,7 @@ export default function MemoryPage() {
             <Brain size={16} className="text-indigo-400" />
           </div>
           <div>
-            <h2 className="text-xl font-extrabold gradient-text tracking-tight">Memory</h2>
+            <h2 className="text-2xl font-extrabold gradient-text tracking-tight">Memory</h2>
             <span className="text-[10px] text-neutral-500 font-medium">{files.length} files</span>
           </div>
         </div>
