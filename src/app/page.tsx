@@ -1,3 +1,4 @@
+{/* pipeline-test-ok */}
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
