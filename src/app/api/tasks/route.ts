@@ -84,6 +84,8 @@ export async function PATCH(req: NextRequest) {
         cwd: home,
         env: { ...process.env, HOME: home }
       });
+      proc.on('spawn', () => { try { fs.closeSync(out); } catch { /* ignore */ } });
+      proc.on('error', () => { try { fs.closeSync(out); } catch { /* ignore */ } });
       proc.unref();
     } catch (e) {
       console.error('Ralph spawn failed:', e);
