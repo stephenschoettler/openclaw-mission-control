@@ -472,6 +472,9 @@ export default function TasksPage() {
                                     <p className="text-sm text-neutral-300 line-clamp-2 leading-snug">{task.title}</p>
                                     <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                                       <span className={`text-[9px] font-semibold px-1 py-0.5 rounded-full ${assigneeColor(task.assignee)}`}>{task.assignee}</span>
+                                      {task.rejection_count > 0 && (
+                                        <span className="flex items-center gap-0.5 text-[10px] font-bold text-red-400" title={`Rejected ${task.rejection_count}×`}>🔴×{task.rejection_count}</span>
+                                      )}
                                       <span className="text-[10px] text-neutral-600">{timeAgo(task.updated_at || task.created_at)}</span>
                                     </div>
                                   </div>
