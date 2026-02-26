@@ -41,18 +41,25 @@ export async function PATCH(req: NextRequest) {
   if (fields.status === 'review' && task) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { spawn } = require('child_process');
-      const ralphTask = `QA review of recently completed work on task: "${task.title}". Check the latest git commit in ~/mission-control for what changed. title_match: "${task.title}". Return APPROVED ✅ or REJECTED ❌.`;
+      const { spawn, execSync } = require('child_process');
+      // Resolve openclaw path relative to HOME — never hardcode absolute paths
+      const home = process.env.HOME || '/home/w0lf';
+      const openclawPath = `${home}/dev/openclaw/openclaw.mjs`;
+      // Include the current git SHA so Ralph knows exactly what to review
+      let sha = 'unknown';
+      try { sha = execSync(`git -C ${home}/mission-control rev-parse --short HEAD`, { encoding: 'utf8' }).trim(); } catch { /* ignore */ }
+      const ralphTask = `QA review of commit ${sha} in ~/mission-control for task: "${task.title}". title_match: "${task.title}". Return APPROVED ✅ or REJECTED ❌.`;
       const proc = spawn(
         'node',
         [
-          '/home/w0lf/dev/openclaw/openclaw.mjs',
+          openclawPath,
           'agent',
           '--agent', 'ralph',
+          '--channel', 'telegram',
+          '--session-id', `ralph-review-${sha}`,
           '--message', ralphTask,
-          '--deliver',
         ],
-        { detached: true, stdio: 'ignore' }
+        { detached: true, stdio: 'ignore', cwd: '/home/w0lf/dev/openclaw' }
       );
       proc.unref();
     } catch { /* never block the response */ }
