@@ -1,13 +1,21 @@
 import { NextResponse } from 'next/server';
+import fs from 'fs';
 import db from '@/lib/db';
 
 /**
  * GET /api/automation/ralph-complete
  *
  * Automation endpoint polled every ~15s from the client.
- * - If Ralph posted task_end in the last 30s → move all 'review' tasks to 'done', clear ralph + code-monkey to idle
- * - If code-monkey posted task_end in the last 30s → clear code-monkey to idle
+ * - If Ralph posted task_end since last check → move all 'review' tasks to 'done', clear ralph + code-monkey to idle
+ * - If code-monkey posted task_end since last check → clear code-monkey to idle
+ *
+ * Uses module-level state to track the last processed activity IDs so a single
+ * event is never processed twice (avoids the 30s window + 15s poll overlap).
  */
+
+let lastProcessedRalphId = 0;
+let lastProcessedMonkeyId = 0;
+
 export async function GET() {
   const results: string[] = [];
 
@@ -16,12 +24,14 @@ export async function GET() {
     SELECT id FROM activity_feed
     WHERE agent_id = 'ralph'
       AND event_type = 'task_end'
-      AND created_at > datetime('now', '-30 seconds')
+      AND id > ?
     ORDER BY id DESC
     LIMIT 1
-  `).get() as { id: number } | undefined;
+  `).get(lastProcessedRalphId) as { id: number } | undefined;
 
   if (ralphEnd) {
+    lastProcessedRalphId = ralphEnd.id;
+
     // Move all tasks in 'review' → 'done'
     const updated = db.prepare(`
       UPDATE tasks
@@ -34,8 +44,6 @@ export async function GET() {
 
       // Append completed tasks to memory
       try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const fs = require('fs');
         const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date());
         const memDir = '/home/w0lf/.openclaw/workspace/memory';
         const memPath = `${memDir}/${date}.md`;
@@ -67,18 +75,20 @@ export async function GET() {
     results.push('Cleared ralph + code-monkey to idle');
   }
 
-  // ── 2. Code-monkey finished a task (without ralph) ──────────────────────────
+  // ── 2. Code-monkey finished a task (no ralph event this cycle) ───────────────
   if (!ralphEnd) {
     const monkeyEnd = db.prepare(`
       SELECT id FROM activity_feed
       WHERE agent_id = 'code-monkey'
         AND event_type = 'task_end'
-        AND created_at > datetime('now', '-30 seconds')
+        AND id > ?
       ORDER BY id DESC
       LIMIT 1
-    `).get() as { id: number } | undefined;
+    `).get(lastProcessedMonkeyId) as { id: number } | undefined;
 
     if (monkeyEnd) {
+      lastProcessedMonkeyId = monkeyEnd.id;
+
       db.prepare(`
         INSERT INTO office_status (agent_id, agent_name, role, current_task, status)
         VALUES ('code-monkey', 'Code Monkey', 'engineering', '', 'idle')
