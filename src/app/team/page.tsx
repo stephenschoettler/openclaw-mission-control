@@ -60,12 +60,12 @@ const WORKER_GROUPS: { manager: string; agents: AgentMeta[] }[] = [
   {
     manager: 'answring',
     agents: [
-      { id: 'answring-ops',        name: 'Felix', emoji: '📊', title: 'Ops Specialist',       tags: ['Operations', 'Process'],   accent: 'blue' },
-      { id: 'answring-dev',        name: 'Zoe',   emoji: '💻', title: 'Dev Specialist',       tags: ['Development', 'Tools'],    accent: 'blue' },
-      { id: 'answring-marketing',  name: 'Leo',   emoji: '📣', title: 'Marketing Specialist', tags: ['Marketing', 'Campaigns'],  accent: 'blue' },
-      { id: 'answring-security',   name: 'Iris',  emoji: '🔒', title: 'Security Specialist',  tags: ['Security', 'Compliance'], accent: 'blue' },
-      { id: 'answring-strategist', name: 'Theo',  emoji: '🧠', title: 'Strategy Specialist',  tags: ['Strategy', 'Analysis'],   accent: 'blue' },
-      { id: 'answring-sales',      name: 'Nadia', emoji: '💰', title: 'Sales Specialist',     tags: ['Sales', 'Pipeline'],       accent: 'blue' },
+      { id: 'answring-ops',        name: 'Olive', emoji: '📊', title: 'Ops Specialist',       tags: ['Operations', 'Process'],   accent: 'blue' },
+      { id: 'answring-dev',        name: 'Dimitri',   emoji: '💻', title: 'Dev Specialist',       tags: ['Development', 'Tools'],    accent: 'blue' },
+      { id: 'answring-marketing',  name: 'Marcus',   emoji: '📣', title: 'Marketing Specialist', tags: ['Marketing', 'Campaigns'],  accent: 'blue' },
+      { id: 'answring-security',   name: 'Sammy',  emoji: '🔒', title: 'Security Specialist',  tags: ['Security', 'Compliance'], accent: 'blue' },
+      { id: 'answring-strategist', name: 'Stella',  emoji: '🧠', title: 'Strategy Specialist',  tags: ['Strategy', 'Analysis'],   accent: 'blue' },
+      { id: 'answring-sales',      name: 'Sal', emoji: '💰', title: 'Sales Specialist',     tags: ['Sales', 'Pipeline'],       accent: 'blue' },
       { id: 'answring-qa',         name: 'Quinn', emoji: '🔍', title: 'QA Specialist',        tags: ['QA', 'Testing'],           accent: 'blue' },
     ],
   },
