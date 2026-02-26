@@ -172,6 +172,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     return () => clearInterval(id);
   }, []);
 
+  // Global automation poller — triggers ralph-complete automation every 15s
+  useEffect(() => {
+    const runAutomation = () => {
+      fetch('/api/automation/ralph-complete').catch(() => {/* silent */});
+    };
+    runAutomation();
+    const id = setInterval(runAutomation, 15000);
+    return () => clearInterval(id);
+  }, []);
+
   // Mark activity as seen when navigating to /activity
   useEffect(() => {
     if (pathname === '/activity') {
