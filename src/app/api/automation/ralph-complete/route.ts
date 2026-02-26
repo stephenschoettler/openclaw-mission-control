@@ -50,10 +50,10 @@ export async function GET() {
 
     let updated;
     if (isRejected) {
-      // Move all tasks in 'review' → 'in-progress'
+      // Move all tasks in 'review' → 'in-progress', increment rejection_count
       updated = db.prepare(`
         UPDATE tasks
-        SET status = 'in-progress', updated_at = datetime('now')
+        SET status = 'in-progress', rejection_count = rejection_count + 1, updated_at = datetime('now')
         WHERE status = 'review'
       `).run();
     } else {

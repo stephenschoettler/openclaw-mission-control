@@ -11,6 +11,7 @@ interface Task {
   assignee: string;
   priority: string;
   status: string;
+  rejection_count: number;
   created_at: string;
 }
 
@@ -226,7 +227,14 @@ export default function TasksPage() {
                                   >
                                     <div className="flex items-start justify-between gap-2">
                                       <div className="flex-1 min-w-0">
-                                        <button onClick={() => startEdit(task)} className="text-sm font-medium text-white hover:text-indigo-400 text-left truncate block w-full transition-colors">{task.title}</button>
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                          <button onClick={() => startEdit(task)} className="text-sm font-medium text-white hover:text-indigo-400 text-left truncate transition-colors">{task.title}</button>
+                                          {task.rejection_count > 0 && (
+                                            <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] font-bold text-red-400" title={`Rejected ${task.rejection_count} time${task.rejection_count !== 1 ? 's' : ''}`}>
+                                              🔴<span>×{task.rejection_count}</span>
+                                            </span>
+                                          )}
+                                        </div>
                                         {task.description && <p className="text-xs text-neutral-500 mt-1 line-clamp-2">{task.description}</p>}
                                       </div>
                                     </div>

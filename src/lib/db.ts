@@ -21,6 +21,7 @@ db.exec(`
     assignee TEXT DEFAULT 'me',
     priority TEXT DEFAULT 'medium',
     status TEXT DEFAULT 'backlog',
+    rejection_count INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
   );
@@ -83,5 +84,10 @@ db.exec(`
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `);
+
+// Migrations
+try {
+  db.exec(`ALTER TABLE tasks ADD COLUMN rejection_count INTEGER DEFAULT 0`);
+} catch { /* column already exists */ }
 
 export default db;
