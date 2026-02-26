@@ -45,7 +45,7 @@ const LAYERS: Layer[] = [
         tags: ['Leadership', 'Strategy', 'Oversight'],
       },
       {
-        id: 'main',
+        id: 'babbage',
         name: 'Babbage',
         emoji: '🤖',
         title: 'Chief of Staff',
@@ -219,11 +219,14 @@ function AgentCard({
   status: string;
   currentTask?: string;
 }) {
-  const isWorking = status === 'working' || status === 'active';
-  const isIdle = status === 'idle';
-  const isOffline = !isWorking && !isIdle;
+  const isOwner = status === 'owner';
+  const isWorking = !isOwner && (status === 'working' || status === 'active');
+  const isIdle = !isOwner && status === 'idle';
+  const isOffline = !isOwner && !isWorking && !isIdle;
 
-  const cardClasses = isWorking
+  const cardClasses = isOwner
+    ? 'card p-4 flex flex-col gap-2.5 border border-yellow-500/30 bg-yellow-950/10 transition-all duration-300'
+    : isWorking
     ? 'card p-4 flex flex-col gap-2.5 border border-green-500/40 bg-green-950/20 shadow-[0_0_15px_rgba(74,222,128,0.3)] transition-all duration-300'
     : isIdle
     ? 'card p-4 flex flex-col gap-2.5 border border-white/[0.06] opacity-60 transition-all duration-300'
@@ -240,8 +243,8 @@ function AgentCard({
           <div className="relative w-12 h-12 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-2xl z-10">
             {agent.emoji}
           </div>
-          {/* LIVE badge for working agents, dot for others */}
-          {isWorking ? (
+          {/* LIVE badge for working agents, dot for idle/offline, nothing for owner */}
+          {!isOwner && (isWorking ? (
             <span className="absolute -bottom-1 -right-1 z-20 text-[9px] font-black bg-green-500 text-black px-1 py-0.5 rounded leading-none tracking-wide uppercase">
               LIVE
             </span>
@@ -250,7 +253,7 @@ function AgentCard({
               className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#0a0a0f] z-20 ${isIdle ? 'bg-yellow-400' : 'bg-neutral-600'}`}
               title={isIdle ? 'Idle' : 'Offline'}
             />
-          )}
+          ))}
         </div>
 
         <div className="flex-1 min-w-0">
@@ -309,7 +312,7 @@ export default function TeamPage() {
   }, [fetchStations]);
 
   const getStationInfo = (agentId: string): { status: string; currentTask?: string } => {
-    if (agentId === 'sir') return { status: 'active' };
+    if (agentId === 'sir') return { status: 'owner' };
     const s = stations.find(st => st.agent_id === agentId);
     if (!s) return { status: 'idle' };
     const resolved = resolveStatus(s.status, s.updated_at ?? new Date().toISOString());
