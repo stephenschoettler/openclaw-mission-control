@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { MAIN_AGENT_ALIAS, MAIN_AGENT_NAME } from '@/config';
 import db from '@/lib/db';
 
 interface SessionData {
@@ -19,8 +20,8 @@ export async function POST() {
     const agentMap = new Map<string, { agent_name: string; hasActive: boolean }>();
 
     for (const s of sessions) {
-      const agent_id = s.agent_id === 'main' ? 'babbage' : s.agent_id;
-      const agent_name = agent_id === 'babbage' ? 'Babbage' : s.agent_name;
+      const agent_id = s.agent_id === 'main' ? MAIN_AGENT_ALIAS : s.agent_id;
+      const agent_name = agent_id === MAIN_AGENT_ALIAS ? MAIN_AGENT_NAME : s.agent_name;
       const existing = agentMap.get(agent_id);
       const hasActive = s.status === 'active';
       if (!existing) {

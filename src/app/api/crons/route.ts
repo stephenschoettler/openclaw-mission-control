@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 
-const CRONS_FILE = path.join(process.env.HOME || '/home/w0lf', '.openclaw', 'cron', 'jobs.json');
+import os from 'os';
+const CRONS_FILE = path.join(process.env.HOME || os.homedir(), '.openclaw', 'cron', 'jobs.json');
 
 export async function GET() {
   try {

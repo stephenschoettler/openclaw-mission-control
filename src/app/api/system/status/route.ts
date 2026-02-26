@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { execSync } from 'child_process';
-
-const DOCKER_CONTAINERS = ['answring-api', 'answring-nginx', 'searxng', 'synclounge', 'open-webui'];
-const SYSTEMD_SERVICES = ['openclaw-gateway', 'mission-control'];
+import { DOCKER_CONTAINERS as CONFIGURED_CONTAINERS, SYSTEMD_SERVICES } from '@/config';
 
 function runCmd(cmd: string): string {
   try {
@@ -33,25 +31,48 @@ function getSystemdStatus(service: string) {
   return { name: service, type: 'systemd', status: active === 'active' ? 'active' : (active || 'unknown'), uptime };
 }
 
-function getDockerStatuses() {
+function getAllDockerContainers(): { name: string; status: string; uptime: string }[] {
   let raw = '';
   try {
-    raw = execSync('docker ps --format json', { timeout: 5000, encoding: 'utf8' }).trim();
+    raw = execSync('docker ps -a --format json', { timeout: 5000, encoding: 'utf8' }).trim();
   } catch {
-    return DOCKER_CONTAINERS.map(name => ({ name, type: 'docker', status: 'unknown', uptime: '' }));
+    return [];
   }
-  const running: Record<string, { status: string; uptime: string }> = {};
+  const results: { name: string; status: string; uptime: string }[] = [];
   for (const line of raw.split('\n')) {
     if (!line.trim()) continue;
     try {
       const p = JSON.parse(line);
-      const n = p.Names || p.Name || '';
-      running[n] = { status: p.State || 'running', uptime: p.RunningFor || p.Status || '' };
+      const name = p.Names || p.Name || '';
+      if (!name) continue;
+      results.push({
+        name,
+        status: p.State || 'unknown',
+        uptime: p.RunningFor || p.Status || '',
+      });
     } catch {}
   }
-  return DOCKER_CONTAINERS.map(name => {
-    const d = running[name];
-    return d ? { name, type: 'docker', status: d.status, uptime: d.uptime } : { name, type: 'docker', status: 'stopped', uptime: '' };
+  return results;
+}
+
+function getDockerStatuses() {
+  const allContainers = getAllDockerContainers();
+
+  // If explicit list configured, filter to those; otherwise show all discovered
+  const containerNames = CONFIGURED_CONTAINERS.length > 0
+    ? CONFIGURED_CONTAINERS
+    : allContainers.map(c => c.name);
+
+  const runningMap: Record<string, { status: string; uptime: string }> = {};
+  for (const c of allContainers) {
+    runningMap[c.name] = { status: c.status, uptime: c.uptime };
+  }
+
+  return containerNames.map(name => {
+    const d = runningMap[name];
+    return d
+      ? { name, type: 'docker', status: d.status, uptime: d.uptime }
+      : { name, type: 'docker', status: 'stopped', uptime: '' };
   });
 }
 

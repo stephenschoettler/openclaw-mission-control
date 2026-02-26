@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { MAIN_AGENT_ALIAS, MAIN_AGENT_NAME } from '@/config';
 import db from '@/lib/db';
 
 interface SessionData {
@@ -27,7 +28,7 @@ export async function GET() {
       const activeAgentIds = new Set(
         sessions
           .filter(s => s.status === 'active')
-          .map(s => s.agent_id === 'main' ? 'babbage' : s.agent_id)
+          .map(s => s.agent_id === 'main' ? MAIN_AGENT_ALIAS : s.agent_id)
       );
       // Update DB: force idle for agents with no active session
       for (const row of rows) {
@@ -69,9 +70,9 @@ export async function POST(req: NextRequest) {
     current_task?: string;
   };
 
-  // Normalize "main" → "babbage" so duplicate rows never appear
-  const normalizedId = body.agent_id === 'main' ? 'babbage' : body.agent_id;
-  const normalizedName = (normalizedId === 'babbage') ? 'Babbage' : body.agent_name;
+  // Normalize "main" → alias so duplicate rows never appear
+  const normalizedId = body.agent_id === 'main' ? MAIN_AGENT_ALIAS : body.agent_id;
+  const normalizedName = (normalizedId === MAIN_AGENT_ALIAS) ? MAIN_AGENT_NAME : body.agent_name;
   const agent_id = normalizedId;
   const agent_name = normalizedName;
   const { status, current_task = '' } = body;

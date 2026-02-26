@@ -4,8 +4,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { FolderOpen, File, FileText, Trash2, Upload, ChevronRight, X, Edit3, Eye, Folder, Code, FileJson, FileType, Terminal, Image as ImageIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
-const HOME = '/home/w0lf';
-
 interface FileEntry {
   name: string;
   path: string;
@@ -19,32 +17,6 @@ interface Workspace {
   path: string;
   label: string;
 }
-
-const WORKSPACES: Workspace[] = [
-  { path: `${HOME}/.openclaw/memory`, label: 'Memory' },
-  { path: `${HOME}/.openclaw/cron`, label: 'Cron Jobs' },
-  { path: `${HOME}/.openclaw/workspace`, label: 'Main' },
-  { path: `${HOME}/.openclaw/workspace-main`, label: 'Main (alt)' },
-  { path: `${HOME}/.openclaw/workspace-dev`, label: 'Code Monkey' },
-  { path: `${HOME}/.openclaw/workspace-dev-backend`, label: 'Code Backend' },
-  { path: `${HOME}/.openclaw/workspace-dev-devops`, label: 'Code DevOps' },
-  { path: `${HOME}/.openclaw/workspace-dev-frontend`, label: 'Code Frontend' },
-  { path: `${HOME}/.openclaw/workspace-ralph`, label: 'Ralph' },
-  { path: `${HOME}/.openclaw/workspace-comms`, label: 'Comms' },
-  { path: `${HOME}/.openclaw/workspace-hustle`, label: 'Hustle' },
-  { path: `${HOME}/.openclaw/workspace-pop`, label: 'Pop' },
-  { path: `${HOME}/.openclaw/workspace-dad`, label: 'Dad' },
-  { path: `${HOME}/.openclaw/workspace-tldr`, label: 'TLDR' },
-  { path: `${HOME}/.openclaw/workspace-browser`, label: 'Browser' },
-  { path: `${HOME}/.openclaw/workspace-answring`, label: 'Answring' },
-  { path: `${HOME}/.openclaw/workspace-answring-dev`, label: 'Answring Dev' },
-  { path: `${HOME}/.openclaw/workspace-answring-marketing`, label: 'Answring Marketing' },
-  { path: `${HOME}/.openclaw/workspace-answring-ops`, label: 'Answring Ops' },
-  { path: `${HOME}/.openclaw/workspace-answring-sales`, label: 'Answring Sales' },
-  { path: `${HOME}/.openclaw/workspace-answring-security`, label: 'Answring Security' },
-  { path: `${HOME}/.openclaw/workspace-answring-strategist`, label: 'Answring Strategist' },
-  { path: `${HOME}/mission-control/src`, label: 'Mission Control' },
-];
 
 const TEXT_EXTENSIONS = new Set([
   'md', 'txt', 'json', 'ts', 'tsx', 'js', 'jsx', 'py', 'sh', 'yaml', 'yml',
@@ -141,7 +113,8 @@ function ImageLightbox({ entry, onClose }: { entry: FileEntry; onClose: () => vo
 }
 
 export default function FilesPage() {
-  const [currentPath, setCurrentPath] = useState(`${HOME}/.openclaw/memory`);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [currentPath, setCurrentPath] = useState('');
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<FileEntry | null>(null);
@@ -154,7 +127,7 @@ export default function FilesPage() {
   const [lightboxEntry, setLightboxEntry] = useState<FileEntry | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const activeWorkspace = WORKSPACES.find(w =>
+  const activeWorkspace = workspaces.find(w =>
     currentPath === w.path || currentPath.startsWith(w.path + '/')
   );
 
@@ -173,8 +146,22 @@ export default function FilesPage() {
     setLoading(false);
   }, []);
 
+  // Load workspaces from API on mount
   useEffect(() => {
-    fetchDir(currentPath);
+    fetch('/api/workspaces')
+      .then(r => r.json())
+      .then((ws: Workspace[]) => {
+        setWorkspaces(ws);
+        if (ws.length > 0 && !currentPath) {
+          setCurrentPath(ws[0].path);
+        }
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (currentPath) fetchDir(currentPath);
   }, [currentPath, fetchDir]);
 
   const navigateTo = (dirPath: string) => {
@@ -296,7 +283,7 @@ export default function FilesPage() {
           <h2 className="text-lg font-extrabold gradient-text tracking-tight">Files</h2>
         </div>
         <div className="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
-          {WORKSPACES.map(ws => {
+          {workspaces.map(ws => {
             const isActive = currentPath === ws.path || currentPath.startsWith(ws.path + '/');
             return (
               <button

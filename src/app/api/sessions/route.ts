@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
+import os from 'os';
+import { OPENCLAW_HOME } from '@/config';
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 
-const OPENCLAW_HOME = process.env.HOME ? path.join(process.env.HOME, '.openclaw') : '/home/w0lf/.openclaw';
 const AGENTS_DIR = path.join(OPENCLAW_HOME, 'agents');
 const CONFIG_PATH = path.join(OPENCLAW_HOME, 'openclaw.json');
 

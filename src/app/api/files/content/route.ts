@@ -2,33 +2,28 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 
-const HOME = process.env.HOME || '/home/w0lf';
+import os from 'os';
+const HOME = process.env.HOME || os.homedir();
 
-const ALLOWED_ROOTS = [
-  `${HOME}/.openclaw/workspace`,
-  `${HOME}/.openclaw/workspace-answring`,
-  `${HOME}/.openclaw/workspace-answring-dev`,
-  `${HOME}/.openclaw/workspace-answring-marketing`,
-  `${HOME}/.openclaw/workspace-answring-ops`,
-  `${HOME}/.openclaw/workspace-answring-sales`,
-  `${HOME}/.openclaw/workspace-answring-security`,
-  `${HOME}/.openclaw/workspace-answring-strategist`,
-  `${HOME}/.openclaw/workspace-browser`,
-  `${HOME}/.openclaw/workspace-comms`,
-  `${HOME}/.openclaw/workspace-dad`,
-  `${HOME}/.openclaw/workspace-dev`,
-  `${HOME}/.openclaw/workspace-dev-backend`,
-  `${HOME}/.openclaw/workspace-dev-devops`,
-  `${HOME}/.openclaw/workspace-dev-frontend`,
-  `${HOME}/.openclaw/workspace-hustle`,
-  `${HOME}/.openclaw/workspace-main`,
-  `${HOME}/.openclaw/workspace-pop`,
-  `${HOME}/.openclaw/workspace-ralph`,
-  `${HOME}/.openclaw/workspace-tldr`,
-  `${HOME}/.openclaw/memory`,
-  `${HOME}/.openclaw/cron`,
-  `${HOME}/mission-control/src`,
-];
+function getWorkspaceRoots(): string[] {
+  const ocHome = path.join(HOME, '.openclaw');
+  const roots: string[] = [];
+  // Always include base workspace and openclaw metadata dirs
+  roots.push(path.join(ocHome, 'memory'));
+  roots.push(path.join(ocHome, 'cron'));
+  // Auto-discover all workspace-* directories
+  try {
+    const entries = fs.readdirSync(ocHome);
+    for (const entry of entries) {
+      if (entry === 'workspace' || entry.startsWith('workspace-')) {
+        roots.push(path.join(ocHome, entry));
+      }
+    }
+  } catch { /* openclaw not installed */ }
+  return roots;
+}
+
+const ALLOWED_ROOTS = getWorkspaceRoots();
 
 const TEXT_EXTENSIONS = new Set([
   'md', 'txt', 'json', 'ts', 'tsx', 'js', 'jsx', 'py', 'sh', 'yaml', 'yml',

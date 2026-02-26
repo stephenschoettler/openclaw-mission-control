@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
+import path from 'path';
 import db from '@/lib/db';
+import { OPENCLAW_HOME, MAIN_AGENT_ALIAS, MAIN_AGENT_NAME } from '@/config';
 
 /**
  * GET /api/automation/ralph-complete
@@ -45,21 +47,16 @@ export async function GET() {
   if (ralphEnd) {
     setState('last_processed_ralph_id', ralphEnd.id);
 
-    // Check if Ralph rejected or approved
-    // New format: "QA REJECTED: ..." vs "QA APPROVED: ..."
-    // Legacy format: "QA complete: ..." (treated as approved)
     const isRejected = ralphEnd.title.includes('REJECTED') || ralphEnd.title.includes('❌') || ralphEnd.title.toLowerCase().includes('rejected');
 
     let updated;
     if (isRejected) {
-      // Move all tasks in 'review' → 'backlog', increment rejection_count
       updated = db.prepare(`
         UPDATE tasks
         SET status = 'backlog', rejection_count = rejection_count + 1, updated_at = datetime('now')
         WHERE status = 'review'
       `).run();
     } else {
-      // Move all tasks in 'review' → 'done'
       updated = db.prepare(`
         UPDATE tasks
         SET status = 'done', updated_at = datetime('now')
@@ -77,8 +74,8 @@ export async function GET() {
       // Append to daily memory file
       try {
         const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date());
-        const memDir = '/home/w0lf/.openclaw/workspace/memory';
-        const memPath = `${memDir}/${date}.md`;
+        const memDir = path.join(OPENCLAW_HOME, 'workspace', 'memory');
+        const memPath = path.join(memDir, `${date}.md`);
         fs.mkdirSync(memDir, { recursive: true });
         const memEntry = isRejected
           ? `\n- ❌ Ralph rejected: ${updated.changes} task(s) moved to backlog (${date})\n`
@@ -97,15 +94,15 @@ export async function GET() {
         updated_at = datetime('now')
     `).run();
 
-    // Clear code-monkey to idle
+    // Clear main agent to idle
     db.prepare(`
       INSERT INTO office_status (agent_id, agent_name, role, current_task, status)
-      VALUES ('code-monkey', 'Code Monkey', 'engineering', '', 'idle')
+      VALUES (?, ?, 'engineering', '', 'idle')
       ON CONFLICT(agent_id) DO UPDATE SET
         current_task = '',
         status = 'idle',
         updated_at = datetime('now')
-    `).run();
+    `).run('code-monkey', 'Code Monkey');
 
     results.push('Cleared ralph + code-monkey to idle');
   }

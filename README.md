@@ -1,57 +1,128 @@
-# ⚡ OpenClaw Mission Control
+# 🎛️ Mission Control
 
-A Mission Control dashboard for [OpenClaw](https://openclaw.ai) agent fleets. Inspired by [@AlexFinn's article](https://x.com/AlexFinn/status/2024169334344679783).
+A real-time operations dashboard for [OpenClaw](https://github.com/openclaw/openclaw) AI agent fleets.
 
-> Built in an afternoon by delegating to the agent fleet itself.
+Monitor agent activity, manage tasks, review costs, browse session logs, and control your infrastructure — all from one place.
 
-## Panels
+![Mission Control screenshot](screenshots/dashboard.png)
 
-| Panel | Description |
-|-------|-------------|
-| 🗂️ **Tasks Board** | Kanban board (Backlog / In Progress / Done) shared between you and your agents |
-| 📅 **Calendar** | Monthly view of OpenClaw cron jobs + manual events |
-| 🧠 **Memory** | Browse and search all agent memory files with markdown preview |
-| 👥 **Team** | Live agent roster pulled from your OpenClaw config — names, models, workspaces |
-| 🎬 **Content Pipeline** | 5-stage kanban for content creation (Idea → Scripted → Thumbnail → Filming → Published) |
-| 🏢 **Office** | Agent workstations with live status and current task |
+---
 
-## Stack
+## Features
 
-- **NextJS 14** (App Router)
-- **Tailwind CSS** (dark theme)
-- **SQLite** via `better-sqlite3` — no SaaS, no Convex account needed
-- **Lucide React** icons
+- **Live Dashboard** — agent statuses, recent activity, task board
+- **Task Management** — kanban-style task tracking with assignees and priorities
+- **Sessions** — browse active and historical agent sessions
+- **Costs** — token usage and cost estimates per agent
+- **Files** — browse agent workspaces and OpenClaw memory files
+- **System** — docker container and systemd service health at a glance
+- **Skills** — view registered OpenClaw skills
+- **Analytics** — task completion trends over time
 
-## Setup
+---
+
+## Requirements
+
+- **Node.js 18+**
+- **OpenClaw gateway** running (default: `http://localhost:3000`)
+- SQLite (bundled via `better-sqlite3`)
+- Docker (optional — for container monitoring)
+
+---
+
+## Quick Start
 
 ```bash
-git clone https://github.com/stephenschoettler/openclaw-mission-control
-cd openclaw-mission-control
+# 1. Clone
+git clone https://github.com/yourname/mission-control.git
+cd mission-control
+
+# 2. Install
 npm install
+
+# 3. Build
 npm run build
-npm start -- -p 3001
+
+# 4. Start
+npm start
 ```
 
-Runs at `http://localhost:3001`.
+Mission Control will be available at **http://localhost:3001**.
 
-## OpenClaw Integration
+---
 
-The dashboard reads directly from your OpenClaw config:
-
-- **Agents** → `~/.openclaw/openclaw.json` (`agents.list`)
-- **Crons** → `~/.openclaw/openclaw.json` (`crons`)
-- **Memory files** → `~/.openclaw/workspace/memory/*.md`
-
-Persistent data (tasks, events, content, office status) is stored at `~/.mission-control/db.sqlite`.
-
-## Systemd Service (optional)
+## Development
 
 ```bash
+npm run dev
+```
+
+---
+
+## Configuration
+
+All settings can be controlled via environment variables or a `.env.local` file in the project root.
+
+| Variable | Default | Description |
+|---|---|---|
+| `OPENCLAW_GATEWAY_URL` | `http://localhost:3000` | OpenClaw gateway URL |
+| `OPENCLAW_DIR` | `~/dev/openclaw` | Path to the openclaw CLI directory |
+| `MAIN_AGENT_ALIAS` | `babbage` | Display alias for the `main` agent |
+| `MAIN_AGENT_NAME` | `Babbage` | Display name for the main agent |
+| `TELEGRAM_TARGET_ID` | _(empty)_ | Telegram chat ID for notifications |
+| `DOCKER_CONTAINERS` | _(auto-discover)_ | Comma-separated list of Docker containers to monitor. If empty, all running containers are shown |
+| `SYSTEMD_SERVICES` | `openclaw-gateway,mission-control` | Comma-separated systemd user services to monitor |
+| `FILE_BROWSER_ROOTS` | _(auto-discover)_ | Comma-separated paths to show in the Files browser. Defaults to all `~/.openclaw/workspace-*` dirs |
+| `SUB_AGENT_IDS` | _(empty)_ | Comma-separated agent IDs to hide when idle |
+
+### Example `.env.local`
+
+```env
+OPENCLAW_GATEWAY_URL=http://localhost:3000
+MAIN_AGENT_ALIAS=babbage
+MAIN_AGENT_NAME=Babbage
+TELEGRAM_TARGET_ID=123456789
+DOCKER_CONTAINERS=my-api,my-nginx,my-db
+SYSTEMD_SERVICES=openclaw-gateway,mission-control,my-service
+```
+
+---
+
+## Running as a systemd service
+
+```ini
+# ~/.config/systemd/user/mission-control.service
+[Unit]
+Description=Mission Control Dashboard
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/mission-control
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+Environment=PORT=3001
+
+[Install]
+WantedBy=default.target
+```
+
+```bash
+systemctl --user daemon-reload
 systemctl --user enable --now mission-control
 ```
 
-Service file is at `~/.config/systemd/user/mission-control.service` after first run.
+---
 
-## Inspired By
+## Architecture
 
-[@AlexFinn](https://x.com/AlexFinn) — [Your OpenClaw is useless without a Mission Control](https://x.com/AlexFinn/status/2024169334344679783)
+- **Next.js 14** (App Router) — frontend + API routes
+- **better-sqlite3** — local SQLite database at `~/.mission-control/mc.db`
+- **Tailwind CSS** — styling
+- No external database required
+
+---
+
+## License
+
+MIT
