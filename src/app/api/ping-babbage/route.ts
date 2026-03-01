@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   }
 
   const target = TELEGRAM_TARGET_ID || 'telegram';
-  const text = `📡 Message from Mission Control: ${message.trim()}`;
+  const text = `📡 Message from Overwatch: ${message.trim()}`;
 
   const result = spawnSync(
     'node',

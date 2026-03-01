@@ -9,7 +9,7 @@ export async function POST(req: Request) {
     let cmd = '';
     if (service === 'gateway') {
       cmd = 'systemctl --user restart openclaw-gateway';
-    } else if (service === 'mission-control') {
+    } else if (service === 'mission-control' || service === 'overwatch') {
       cmd = 'systemctl --user restart mission-control';
     } else if (service.startsWith('docker:')) {
       const container = service.replace('docker:', '');

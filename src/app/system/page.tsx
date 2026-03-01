@@ -182,7 +182,7 @@ export default function SystemPage() {
           Restart Gateway
         </button>
         <button
-          onClick={() => askRestart('mission-control', 'Mission Control', 'The page will reload in ~3 seconds.')}
+          onClick={() => askRestart('mission-control', 'Overwatch', 'The page will reload in ~3 seconds.')}
           disabled={restarting === 'mission-control'}
           className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[#252528] border border-white/[0.08] text-sm font-medium text-neutral-200 hover:bg-white/[0.08] hover:border-indigo-500/30 transition-all disabled:opacity-50"
         >

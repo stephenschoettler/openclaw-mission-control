@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        message: `📋 New approval request: "${title}" from ${agent}\n\nCheck Mission Control: http://localhost:3001/approvals`
+        message: `📋 New approval request: "${title}" from ${agent}\n\nCheck Overwatch: http://localhost:3001/approvals`
       })
     }).catch(() => {});
 

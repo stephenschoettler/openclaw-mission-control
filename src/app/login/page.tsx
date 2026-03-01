@@ -63,7 +63,7 @@ function LoginForm() {
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-lg font-bold mb-4 shadow-lg shadow-indigo-500/20">
             MC
           </div>
-          <h1 className="text-xl font-bold text-white tracking-tight">Mission Control</h1>
+          <h1 className="text-xl font-bold text-white tracking-tight">Overwatch</h1>
           <p className="text-[12px] text-neutral-500 mt-1 tracking-wide">OPENCLAW FLEET</p>
         </div>
 

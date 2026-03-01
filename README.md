@@ -1,10 +1,10 @@
-# 🎛️ Mission Control
+# 🎛️ Overwatch
 
 A real-time operations dashboard for [OpenClaw](https://github.com/openclaw/openclaw) AI agent fleets.
 
 Monitor agent activity, manage tasks, review costs, browse session logs, and control your infrastructure — all from one place.
 
-![Mission Control screenshot](screenshots/dashboard.png)
+![Overwatch screenshot](screenshots/dashboard.png)
 
 ---
 
@@ -47,7 +47,7 @@ npm run build
 npm start
 ```
 
-Mission Control will be available at **http://localhost:3001**.
+Overwatch will be available at **http://localhost:3001**.
 
 ---
 
@@ -93,7 +93,7 @@ SYSTEMD_SERVICES=openclaw-gateway,mission-control,my-service
 ```ini
 # ~/.config/systemd/user/mission-control.service
 [Unit]
-Description=Mission Control Dashboard
+Description=Overwatch Dashboard
 After=network.target
 
 [Service]

@@ -4,7 +4,7 @@ import "./globals.css";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { LayoutDashboard, CheckSquare, CalendarDays, FolderOpen, Users, Film, Zap, Inbox, Activity, Send, Monitor, DollarSign, LogOut, Puzzle, BarChart2, Menu, X, Server } from "lucide-react";
+import { LayoutDashboard, CheckSquare, CalendarDays, FolderOpen, Users, Film, Zap, Inbox, Activity, Send, Monitor, DollarSign, LogOut, Puzzle, BarChart2, Menu, X, Server, Building2, Trophy, TrendingUp, CreditCard } from "lucide-react";
 
 const navGroups = [
   {
@@ -39,6 +39,15 @@ const navGroups = [
       { href: '/content', label: 'Content', icon: Film },
       { href: '/files', label: 'Files', icon: FolderOpen },
       { href: '/skills', label: 'Skills', icon: Puzzle },
+    ],
+  },
+  {
+    label: 'Office',
+    items: [
+      { href: '/office', label: 'Office', icon: Building2 },
+      { href: '/leaderboard', label: 'Leaderboard', icon: Trophy },
+      { href: '/stats', label: 'Stats', icon: TrendingUp },
+      { href: '/cards', label: 'Cards', icon: CreditCard },
     ],
   },
 ];
@@ -222,8 +231,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     return (
       <html lang="en">
         <head>
-          <title>Mission Control — Sign In</title>
-          <meta name="description" content="OpenClaw Fleet Dashboard" />
+          <title>Overwatch — Sign In</title>
+          <meta name="description" content="Overwatch" />
         </head>
         <body className="antialiased">{children}</body>
       </html>
@@ -233,8 +242,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
-        <title>Mission Control</title>
-        <meta name="description" content="OpenClaw Fleet Dashboard" />
+        <title>Overwatch</title>
+        <meta name="description" content="Overwatch" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -250,8 +259,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
             </button>
             <Link href="/" className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">🚀</div>
-              <span className="text-sm font-bold text-white tracking-tight">Mission Control</span>
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">👁️</div>
+              <span className="text-sm font-bold text-white tracking-tight">Overwatch</span>
             </Link>
           </div>
 
@@ -273,11 +282,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="block px-5 pt-5 pb-4 group">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold">
-                  🚀
+                  👁️
                 </div>
                 <div>
-                  <h1 className="text-sm font-bold text-white tracking-tight">Mission Control</h1>
-                  <p className="text-[10px] text-neutral-500 tracking-wide">OPENCLAW FLEET</p>
+                  <h1 className="text-sm font-bold text-white tracking-tight">Overwatch</h1>
+                  <p className="text-[10px] text-neutral-500 tracking-wide">AGENT OPS</p>
                 </div>
               </div>
             </Link>
