@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, ChevronDown, ChevronUp, Activity } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { RefreshCw, ChevronDown, ChevronUp, Activity, Plus, Play } from 'lucide-react';
 
 interface TodoItem {
   title: string;
@@ -10,6 +10,9 @@ interface TodoItem {
   problem: string;
   files: string;
   solution: string;
+  assignee?: string;
+  prLink?: string;
+  snoozeUntil?: string;
 }
 
 interface CompletedItem {
@@ -38,6 +41,8 @@ interface ActivityEntry {
   created_at: string;
 }
 
+const KNOWN_AGENTS = ['code-monkey', 'code-backend', 'code-frontend', 'code-security', 'code-docs', 'ralph', 'pixel', 'main'];
+
 const AGENT_COLORS: Record<string, string> = {
   main:            'text-violet-400 bg-violet-500/15',
   'code-monkey':   'text-blue-400 bg-blue-500/15',
@@ -55,6 +60,225 @@ function agentColor(id: string) {
 
 function formatLastUpdated(date: Date): string {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function extractPriority(title: string): 'P1' | 'P2' | 'P3' | null {
+  const m = title.match(/\b(P[123])\b/i);
+  return m ? (m[1].toUpperCase() as 'P1' | 'P2' | 'P3') : null;
+}
+
+function parseLocalDate(dateStr: string): Date {
+  const iso = dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T');
+  return new Date(iso);
+}
+
+function todoAge(dateStr: string): string {
+  if (!dateStr) return '';
+  const diff = Date.now() - parseLocalDate(dateStr).getTime();
+  if (isNaN(diff)) return '';
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+function todoAgeColor(dateStr: string, priority: 'P1' | 'P2' | 'P3' | null): string {
+  if (!dateStr || priority !== 'P1') return 'text-neutral-600';
+  const diffH = (Date.now() - parseLocalDate(dateStr).getTime()) / 3600000;
+  if (isNaN(diffH)) return 'text-neutral-600';
+  if (diffH > 4) return 'text-red-400';
+  if (diffH > 1) return 'text-amber-400';
+  return 'text-neutral-600';
+}
+
+function isSnoozed(snoozeUntil?: string): boolean {
+  if (!snoozeUntil) return false;
+  return new Date(snoozeUntil) > new Date();
+}
+
+function PriorityBadge({ priority }: { priority: 'P1' | 'P2' | 'P3' }) {
+  const styles: Record<string, string> = {
+    P1: 'bg-red-500/20 text-red-400 border border-red-500/30',
+    P2: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
+    P3: 'bg-neutral-500/20 text-neutral-400 border border-neutral-500/30',
+  };
+  return (
+    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${styles[priority]}`}>
+      {priority}
+    </span>
+  );
+}
+
+const SNOOZE_OPTIONS = [
+  { label: '1h', getDate: () => { const d = new Date(); d.setHours(d.getHours() + 1); return d; } },
+  { label: '4h', getDate: () => { const d = new Date(); d.setHours(d.getHours() + 4); return d; } },
+  { label: 'tomorrow', getDate: () => { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); return d; } },
+  { label: 'next week', getDate: () => { const d = new Date(); d.setDate(d.getDate() + 7); d.setHours(9, 0, 0, 0); return d; } },
+];
+
+function SnoozeButton({ agentId, todo, onSnoozed }: { agentId: string; todo: TodoItem; onSnoozed: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const snooze = async (snoozeUntil: Date) => {
+    setLoading(true);
+    try {
+      await fetch(`/api/todos/${agentId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: todo.action, snoozeUntil: snoozeUntil.toISOString() }),
+      });
+      onSnoozed();
+    } catch {
+      // silently fail
+    } finally {
+      setLoading(false);
+      setOpen(false);
+    }
+  };
+
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button
+        onClick={() => setOpen(o => !o)}
+        disabled={loading}
+        title="Snooze"
+        className="text-[13px] leading-none text-neutral-600 hover:text-neutral-300 transition-colors disabled:opacity-40"
+      >
+        💤
+      </button>
+      {open && (
+        <div className="absolute right-0 top-6 z-10 bg-[#16161f] border border-white/[0.1] rounded-lg shadow-xl py-1 min-w-[110px]">
+          {SNOOZE_OPTIONS.map(opt => (
+            <button
+              key={opt.label}
+              onClick={() => snooze(opt.getDate())}
+              className="w-full text-left px-3 py-1.5 text-[11px] text-neutral-300 hover:bg-white/[0.06] transition-colors"
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AddTodoForm({ agentId, onSuccess, onCancel }: { agentId: string; onSuccess: () => void; onCancel: () => void }) {
+  const [action, setAction] = useState('');
+  const [problem, setProblem] = useState('');
+  const [files, setFiles] = useState('');
+  const [priority, setPriority] = useState<'P1' | 'P2' | 'P3'>('P3');
+  const [solution, setSolution] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [conflict, setConflict] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setConflict(false);
+    setError('');
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/todos/${agentId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, problem, files, priority, solution }),
+      });
+      if (res.status === 409) {
+        setConflict(true);
+      } else if (res.ok) {
+        setSuccess(true);
+        setTimeout(() => {
+          setSuccess(false);
+          onSuccess();
+        }, 1000);
+      } else {
+        setError(`Error ${res.status}`);
+      }
+    } catch {
+      setError('Network error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const inputCls = 'w-full bg-white/[0.05] border border-white/[0.1] rounded-md px-2.5 py-1.5 text-xs text-white placeholder:text-neutral-600 focus:outline-none focus:border-indigo-500/60 transition-colors';
+
+  return (
+    <form onSubmit={submit} className={`mt-3 p-3 rounded-lg border space-y-2 transition-colors duration-300 ${success ? 'bg-green-500/10 border-green-500/30' : 'bg-white/[0.03] border-white/[0.08]'}`}>
+      {success && (
+        <div className="text-[11px] text-green-400 bg-green-500/10 border border-green-500/20 rounded px-2 py-1.5 flex items-center gap-1.5">
+          ✓ Added successfully!
+        </div>
+      )}
+      {conflict && (
+        <div className="text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-2 py-1.5">
+          ⚠️ A similar todo already exists
+        </div>
+      )}
+      {error && (
+        <div className="text-[11px] text-red-400 bg-red-500/10 border border-red-500/20 rounded px-2 py-1.5">
+          {error}
+        </div>
+      )}
+      <div>
+        <label className="text-[10px] text-neutral-500 mb-0.5 block">Action *</label>
+        <input required value={action} onChange={e => setAction(e.target.value)} placeholder="What needs to be done?" className={inputCls} />
+      </div>
+      <div>
+        <label className="text-[10px] text-neutral-500 mb-0.5 block">Problem *</label>
+        <textarea required value={problem} onChange={e => setProblem(e.target.value)} placeholder="Describe the problem…" rows={2} className={`${inputCls} resize-none`} />
+      </div>
+      <div>
+        <label className="text-[10px] text-neutral-500 mb-0.5 block">Files *</label>
+        <input required value={files} onChange={e => setFiles(e.target.value)} placeholder="Relevant files or paths" className={inputCls} />
+      </div>
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <label className="text-[10px] text-neutral-500 mb-0.5 block">Priority</label>
+          <select value={priority} onChange={e => setPriority(e.target.value as 'P1' | 'P2' | 'P3')} className={`${inputCls} cursor-pointer`}>
+            <option value="P1">P1 — Critical</option>
+            <option value="P2">P2 — Important</option>
+            <option value="P3">P3 — Normal</option>
+          </select>
+        </div>
+        <div className="flex-1">
+          <label className="text-[10px] text-neutral-500 mb-0.5 block">Solution (optional)</label>
+          <input value={solution} onChange={e => setSolution(e.target.value)} placeholder="Suggested approach" className={inputCls} />
+        </div>
+      </div>
+      <div className="flex gap-2 pt-1">
+        <button
+          type="submit"
+          disabled={submitting}
+          className="flex-1 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors disabled:opacity-50"
+        >
+          {submitting ? 'Saving…' : 'Add Todo'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-3 py-1.5 rounded-md bg-white/[0.05] hover:bg-white/[0.1] text-neutral-400 text-xs transition-colors"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
 }
 
 const EVENT_TYPE_CONFIG: Record<ActivityEntry['event_type'], { label: string; color: string; bg: string; border: string }> = {
@@ -101,7 +325,7 @@ function relativeTime(dateStr: string): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-function ActivityCard({ entry }: { entry: ActivityEntry }) {
+function ActivityRow({ entry }: { entry: ActivityEntry }) {
   const [expanded, setExpanded] = useState(false);
   const cfg = EVENT_TYPE_CONFIG[entry.event_type] || EVENT_TYPE_CONFIG.system;
   const emoji = getAgentEmoji(entry.agent_id);
@@ -114,32 +338,29 @@ function ActivityCard({ entry }: { entry: ActivityEntry }) {
         </div>
         <div className="w-px flex-1 bg-white/[0.05] mt-1" />
       </div>
-      <div className="flex-1 pb-4">
-        <div className="card p-3.5 shimmer-hover">
+      <div className="flex-1 pb-3">
+        <div className="card p-3 shimmer-hover">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-2 min-w-0">
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border shrink-0 mt-0.5 ${cfg.color} ${cfg.bg} ${cfg.border}`}>
+              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border shrink-0 mt-0.5 ${cfg.color} ${cfg.bg} ${cfg.border}`}>
                 {cfg.label}
               </span>
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-white leading-snug">{entry.title}</p>
-                <p className="text-[11px] text-neutral-500 mt-0.5">{entry.agent_name}</p>
+                <p className="text-[10px] text-neutral-500 mt-0.5">{entry.agent_name} · {relativeTime(entry.created_at)}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-[10px] text-neutral-600 font-mono">{relativeTime(entry.created_at)}</span>
-              {entry.detail && (
-                <button
-                  onClick={() => setExpanded(e => !e)}
-                  className="text-neutral-600 hover:text-neutral-300 transition-colors"
-                >
-                  {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                </button>
-              )}
-            </div>
+            {entry.detail && (
+              <button
+                onClick={() => setExpanded(e => !e)}
+                className="text-neutral-600 hover:text-neutral-300 transition-colors shrink-0 mt-0.5"
+              >
+                {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+              </button>
+            )}
           </div>
           {expanded && entry.detail && (
-            <div className="mt-2.5 pt-2.5 border-t border-white/[0.06]">
+            <div className="mt-2 pt-2 border-t border-white/[0.06]">
               <p className="text-[11px] text-neutral-400 font-mono whitespace-pre-wrap break-words">{entry.detail}</p>
             </div>
           )}
@@ -149,10 +370,35 @@ function ActivityCard({ entry }: { entry: ActivityEntry }) {
   );
 }
 
+async function postActivity(payload: {
+  agent_id: string;
+  agent_name: string;
+  event_type: string;
+  title: string;
+  detail: string;
+}) {
+  await fetch('/api/activity', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
 export default function TodosPage() {
   const [data, setData] = useState<TodosResponse | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
+  const [snoozeOverrides, setSnoozeOverrides] = useState<Record<string, string>>({});
+
+  // Add todo form open state per agent
+  const [addFormOpen, setAddFormOpen] = useState<Record<string, boolean>>({});
+
+  // In-progress todos: key = `agentId:action`
+  const [inProgress, setInProgress] = useState<Record<string, boolean>>({});
+
+  // Execute All P1s state
+  const [executingP1s, setExecutingP1s] = useState(false);
+  const [executeP1Status, setExecuteP1Status] = useState('');
 
   const [allEntries, setAllEntries] = useState<ActivityEntry[]>([]);
   const [activityLoading, setActivityLoading] = useState(true);
@@ -178,7 +424,7 @@ export default function TodosPage() {
 
   const fetchEntries = useCallback(async () => {
     try {
-      const res = await fetch('/api/activity');
+      const res = await fetch('/api/activity?hours=24');
       const actData: ActivityEntry[] = await res.json();
       setAllEntries(actData);
     } catch {
@@ -200,11 +446,62 @@ export default function TodosPage() {
     return () => clearInterval(id);
   }, [fetchEntries]);
 
-  const agents = data?.agents ?? [];
+  const apiAgents = data?.agents ?? [];
+  const agentMap = new Map(apiAgents.map(a => [a.agentId, a]));
+  const agents: AgentTodos[] = KNOWN_AGENTS.map(id =>
+    agentMap.get(id) ?? { agentId: id, workspacePath: '', todos: [], completed: [] }
+  );
+  // Also include any API agents not in KNOWN_AGENTS
+  apiAgents.forEach(a => { if (!agentMap.has(a.agentId) || !KNOWN_AGENTS.includes(a.agentId)) agents.push(a); });
   const totalTodos = agents.reduce((sum, a) => sum + a.todos.length, 0);
 
+  const allP1Todos = agents.flatMap(agent =>
+    agent.todos
+      .filter(t => extractPriority(t.title) === 'P1')
+      .map(t => ({ agent, todo: t }))
+  );
+
+  const handleSnoozed = (agentId: string, action: string, until: string) => {
+    setSnoozeOverrides(prev => ({ ...prev, [`${agentId}:${action}`]: until }));
+    setTimeout(fetchTodos, 500);
+  };
+
+  function isTodoSnoozed(agentId: string, todo: TodoItem): boolean {
+    const override = snoozeOverrides[`${agentId}:${todo.action}`];
+    if (override && new Date(override) > new Date()) return true;
+    return isSnoozed(todo.snoozeUntil);
+  }
+
+  function prNumber(prLink: string): string {
+    const m = prLink.match(/\/pull\/(\d+)/);
+    return m ? `#${m[1]}` : prLink;
+  }
+
+  const executeTodo = async (agentId: string, agentName: string, todo: TodoItem) => {
+    const key = `${agentId}:${todo.action}`;
+    setInProgress(prev => ({ ...prev, [key]: true }));
+    await postActivity({
+      agent_id: agentId,
+      agent_name: agentName,
+      event_type: 'task_start',
+      title: `Started: ${todo.action}`,
+      detail: todo.problem.slice(0, 100),
+    });
+  };
+
+  const executeAllP1s = async () => {
+    if (allP1Todos.length === 0) return;
+    setExecutingP1s(true);
+    setExecuteP1Status(`Executing ${allP1Todos.length} P1 todo${allP1Todos.length !== 1 ? 's' : ''}…`);
+    for (const { agent, todo } of allP1Todos) {
+      await executeTodo(agent.agentId, agent.agentId, todo);
+    }
+    setExecutingP1s(false);
+    setExecuteP1Status('');
+  };
+
   return (
-    <div className="max-w-4xl mx-auto space-y-10">
+    <div className="max-w-7xl mx-auto space-y-10">
       {/* Todos Section */}
       <div>
         <div className="flex items-center justify-between mb-6">
@@ -214,91 +511,190 @@ export default function TodosPage() {
               <p className="text-[11px] text-neutral-600 mt-0.5">Updated {formatLastUpdated(lastUpdated)} · refreshes every 60s</p>
             )}
           </div>
-          <button
-            onClick={fetchTodos}
-            className="p-2 rounded-lg text-neutral-600 hover:text-neutral-300 hover:bg-white/[0.05] transition-all"
-            title="Refresh"
-          >
-            <RefreshCw size={14} />
-          </button>
+          <div className="flex items-center gap-2">
+            {allP1Todos.length > 0 && (
+              <button
+                onClick={executeAllP1s}
+                disabled={executingP1s}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-semibold transition-colors disabled:opacity-60"
+              >
+                <Play size={11} className="fill-current" />
+                Execute All P1s ({allP1Todos.length})
+              </button>
+            )}
+            <button
+              onClick={fetchTodos}
+              className="p-2 rounded-lg text-neutral-600 hover:text-neutral-300 hover:bg-white/[0.05] transition-all"
+              title="Refresh"
+            >
+              <RefreshCw size={14} />
+            </button>
+          </div>
         </div>
+
+        {executeP1Status && (
+          <div className="mb-4 flex items-center gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+            <div className="w-2 h-2 rounded-full bg-red-400 pulse-dot shrink-0" />
+            {executeP1Status}
+          </div>
+        )}
 
         {loading && (
           <div className="text-center py-16 text-neutral-600 text-sm">Loading todos…</div>
         )}
 
-        {!loading && agents.length === 0 && (
-          <div className="card p-8 text-center">
-            <p className="text-neutral-500 text-sm">No TO-DOS.md files found in any agent workspace.</p>
-            <p className="text-neutral-600 text-xs mt-2">Create a TO-DOS.md in ~/.openclaw/workspace[-name]/ to see todos here.</p>
-          </div>
-        )}
-
-        {!loading && agents.length > 0 && (
+        {!loading && (
           <>
             <div className="mb-4 flex items-center gap-3">
-              <span className="text-sm text-neutral-500">{totalTodos} todo{totalTodos !== 1 ? 's' : ''} across {agents.length} agent{agents.length !== 1 ? 's' : ''}</span>
+              <span className="text-sm text-neutral-500">{totalTodos} todo{totalTodos !== 1 ? 's' : ''} across {apiAgents.length} active agent{apiAgents.length !== 1 ? 's' : ''}</span>
             </div>
 
-            <div className="space-y-6">
-              {agents.map((agent) => (
-                <div key={agent.agentId} className="card p-5">
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className={`text-[11px] font-bold px-2 py-1 rounded-full ${agentColor(agent.agentId)}`}>
-                      {agent.agentId}
-                    </span>
-                    <span className="text-[10px] text-neutral-600 font-mono truncate">{agent.workspacePath}</span>
-                    <span className="ml-auto text-[10px] text-neutral-600">{agent.todos.length} item{agent.todos.length !== 1 ? 's' : ''}</span>
-                  </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {agents.map((agent) => {
+                const activeTodos = agent.todos.filter(t => !isTodoSnoozed(agent.agentId, t));
+                const snoozedTodos = agent.todos.filter(t => isTodoSnoozed(agent.agentId, t));
+                const isAddOpen = addFormOpen[agent.agentId] ?? false;
+                return (
+                  <div key={agent.agentId} className="card p-5 flex flex-col">
+                    {/* Agent header */}
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className={`text-[11px] font-bold px-2 py-1 rounded-full ${agentColor(agent.agentId)}`}>
+                        {agent.agentId}
+                      </span>
+                      <span className="text-[10px] text-neutral-600">{agent.todos.length} item{agent.todos.length !== 1 ? 's' : ''}</span>
+                      <button
+                        onClick={() => setAddFormOpen(prev => ({ ...prev, [agent.agentId]: !isAddOpen }))}
+                        className="ml-auto flex items-center gap-1 px-2 py-1 rounded-md bg-white/[0.04] hover:bg-white/[0.08] text-neutral-400 hover:text-white text-[10px] font-medium transition-colors border border-white/[0.07]"
+                        title="Add todo"
+                      >
+                        <Plus size={10} />
+                        Add Todo
+                      </button>
+                    </div>
 
-                  <div className="space-y-2">
-                    {agent.todos.map((todo, i) => (
-                      <div key={i} className="p-3 rounded-lg bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] transition-colors">
-                        <div className="flex items-start gap-2">
-                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-400/60 mt-1.5 flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-baseline gap-2 flex-wrap">
-                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${agentColor(agent.agentId)}`}>
-                                {agent.agentId}
-                              </span>
-                              <span className="text-sm font-medium text-white">{todo.action}</span>
-                              {todo.problem && (
-                                <>
-                                  <span className="text-neutral-600">—</span>
-                                  <span className="text-xs text-neutral-400 truncate max-w-[300px]">{todo.problem}</span>
-                                </>
-                              )}
-                              {todo.files && (
-                                <span className="text-[10px] text-neutral-600 font-mono truncate max-w-[200px]">({todo.files})</span>
-                              )}
-                            </div>
-                            {(todo.title || todo.date) && (
-                              <div className="mt-1 flex items-center gap-2">
-                                {todo.title && <span className="text-[10px] text-neutral-600">{todo.title}</span>}
-                                {todo.date && <span className="text-[10px] text-neutral-700">· {todo.date}</span>}
+                    {isAddOpen && (
+                      <AddTodoForm
+                        agentId={agent.agentId}
+                        onSuccess={() => {
+                          setAddFormOpen(prev => ({ ...prev, [agent.agentId]: false }));
+                          fetchTodos();
+                        }}
+                        onCancel={() => setAddFormOpen(prev => ({ ...prev, [agent.agentId]: false }))}
+                      />
+                    )}
+
+                    <div className="space-y-2 flex-1">
+                      {activeTodos.length === 0 && snoozedTodos.length === 0 && (
+                        <p className="text-[11px] text-neutral-700 italic py-1">No active todos</p>
+                      )}
+                      {activeTodos.map((todo, i) => {
+                        const priority = extractPriority(todo.title);
+                        const age = todoAge(todo.date);
+                        const ageColor = todoAgeColor(todo.date, priority);
+                        const todoKey = `${agent.agentId}:${todo.action}`;
+                        const isRunning = inProgress[todoKey] ?? false;
+                        return (
+                          <div key={i} className={`p-3 rounded-lg border transition-colors ${isRunning ? 'bg-green-500/[0.05] border-green-500/20' : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04]'}`}>
+                            <div className="flex items-start gap-2">
+                              <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${isRunning ? 'bg-green-400 pulse-dot' : 'bg-indigo-400/60'}`} />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                                  {priority && <PriorityBadge priority={priority} />}
+                                  {isRunning && (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-green-500/20 text-green-400 border border-green-500/30">
+                                      In Progress
+                                    </span>
+                                  )}
+                                  {age && (
+                                    <span className={`text-[9px] font-mono ${ageColor}`}>{age}</span>
+                                  )}
+                                  <span className="text-xs font-medium text-white leading-snug">{todo.action}</span>
+                                </div>
+                                {todo.problem && (
+                                  <p className="text-[11px] text-neutral-400 mt-0.5 leading-snug">{todo.problem}</p>
+                                )}
+                                {todo.files && (
+                                  <p className="text-[10px] text-neutral-600 font-mono mt-0.5 truncate">{todo.files}</p>
+                                )}
+                                {todo.solution && (
+                                  <p className="text-[11px] text-green-400/70 mt-1">→ {todo.solution}</p>
+                                )}
+                                {(todo.assignee || todo.prLink) && (
+                                  <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                                    {todo.assignee && (
+                                      <span className="text-[10px] text-neutral-400 bg-white/[0.04] border border-white/[0.08] rounded px-1.5 py-0.5">
+                                        → {todo.assignee}
+                                      </span>
+                                    )}
+                                    {todo.prLink && (
+                                      <a
+                                        href={todo.prLink}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-[10px] font-mono text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 rounded px-1.5 py-0.5 transition-colors"
+                                      >
+                                        {prNumber(todo.prLink)}
+                                      </a>
+                                    )}
+                                  </div>
+                                )}
+                                {(todo.title || todo.date) && (
+                                  <div className="mt-1 flex items-center gap-2">
+                                    {todo.title && !extractPriority(todo.title) && (
+                                      <span className="text-[10px] text-neutral-600">{todo.title}</span>
+                                    )}
+                                    {todo.date && <span className="text-[10px] text-neutral-700">· {todo.date}</span>}
+                                  </div>
+                                )}
                               </div>
-                            )}
-                            {todo.solution && (
-                              <p className="text-[11px] text-green-400/70 mt-1">→ {todo.solution}</p>
-                            )}
+                              <div className="flex flex-col items-end gap-1.5 shrink-0">
+                                {!isRunning && (
+                                  <button
+                                    onClick={() => executeTodo(agent.agentId, agent.agentId, todo)}
+                                    title="Execute"
+                                    className="flex items-center gap-1 px-2 py-1 rounded-md bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-400 hover:text-indigo-300 text-[10px] font-medium transition-colors border border-indigo-500/20"
+                                  >
+                                    <Play size={9} className="fill-current" />
+                                    Execute
+                                  </button>
+                                )}
+                                <SnoozeButton
+                                  agentId={agent.agentId}
+                                  todo={todo}
+                                  onSnoozed={() => handleSnoozed(agent.agentId, todo.action, new Date(Date.now() + 3600000).toISOString())}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {snoozedTodos.map((todo, i) => (
+                        <div key={`snoozed-${i}`} className="p-3 rounded-lg bg-white/[0.01] border border-white/[0.04] opacity-40">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px]">💤</span>
+                            <span className="text-[11px] text-neutral-600 truncate">{todo.action}</span>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
 
-                    {/* Completed items */}
-                    {agent.completed && agent.completed.length > 0 && agent.completed.map((item, i) => (
-                      <div key={`done-${i}`} className="px-3 py-2 rounded-lg bg-white/[0.01] border border-white/[0.04] flex items-center gap-2 opacity-60">
-                        <span className="text-base leading-none">✅</span>
-                        <span className="text-xs text-neutral-500 line-through">{item.action}</span>
-                        {item.completedAt && (
-                          <span className="text-[10px] text-neutral-700 font-mono ml-auto shrink-0">{item.completedAt}</span>
-                        )}
-                      </div>
-                    ))}
+                      {agent.completed && agent.completed.length > 0 && (
+                        <div className="mt-1 pt-1 border-t border-white/[0.04] space-y-1.5">
+                          {agent.completed.map((item, i) => (
+                            <div key={`done-${i}`} className="px-2 py-1.5 rounded-lg bg-white/[0.01] flex items-center gap-2 opacity-50">
+                              <span className="text-sm leading-none">✅</span>
+                              <span className="text-xs text-neutral-500 line-through flex-1 min-w-0 truncate">{item.action}</span>
+                              {item.completedAt && (
+                                <span className="text-[10px] text-neutral-700 font-mono shrink-0">{item.completedAt}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </>
         )}
@@ -313,17 +709,16 @@ export default function TodosPage() {
             </div>
             <div>
               <h2 className="text-2xl font-extrabold gradient-text tracking-tight">Activity Feed</h2>
-              <p className="text-xs text-neutral-500 mt-0.5">Live stream of agent events</p>
+              <p className="text-xs text-neutral-500 mt-0.5">Last 24h · refreshes every 10s</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-green-400 pulse-dot" />
-            <span className="text-[11px] text-neutral-500">Live · refreshes every 10s</span>
+            <span className="text-[11px] text-neutral-500">Live</span>
           </div>
         </div>
 
-        {/* Filter */}
-        <div className="mb-6">
+        <div className="mb-5">
           <input
             type="text"
             placeholder="Filter by agent ID..."
@@ -341,14 +736,14 @@ export default function TodosPage() {
               <Activity size={20} className="text-neutral-600" />
             </div>
             <div>
-              <p className="text-sm font-medium text-neutral-500">No activity yet</p>
+              <p className="text-sm font-medium text-neutral-500">No activity in the last 24h</p>
               <p className="text-xs text-neutral-700 mt-1">Events will appear here as agents report them</p>
             </div>
           </div>
         ) : (
           <div className="space-y-0">
             {entries.map(entry => (
-              <ActivityCard key={entry.id} entry={entry} />
+              <ActivityRow key={entry.id} entry={entry} />
             ))}
           </div>
         )}
