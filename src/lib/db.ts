@@ -14,18 +14,6 @@ db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
 db.exec(`
-  CREATE TABLE IF NOT EXISTS tasks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    description TEXT DEFAULT '',
-    assignee TEXT DEFAULT 'me',
-    priority TEXT DEFAULT 'medium',
-    status TEXT DEFAULT 'backlog',
-    rejection_count INTEGER DEFAULT 0,
-    created_at TEXT DEFAULT (datetime('now')),
-    updated_at TEXT DEFAULT (datetime('now'))
-  );
-
   CREATE TABLE IF NOT EXISTS events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
@@ -84,10 +72,5 @@ db.exec(`
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `);
-
-// Migrations
-try {
-  db.exec(`ALTER TABLE tasks ADD COLUMN rejection_count INTEGER DEFAULT 0`);
-} catch { /* column already exists */ }
 
 export default db;

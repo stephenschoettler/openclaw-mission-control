@@ -58,7 +58,37 @@ export async function GET() {
   const assigneeMap: Record<string, number> = {};
   for (const r of byAssigneeArchived) assigneeMap[r.assignee] = r.count;
   for (const r of todayByAssignee) assigneeMap[r.assignee] = (assigneeMap[r.assignee] || 0) + r.count;
-  const byAssignee = Object.entries(assigneeMap)
+
+  const DISPLAY_NAMES: Record<string, string> = {
+    'code monkey': 'Code Monkey',
+    'code-monkey': 'Code Monkey',
+    'babbage': 'Babbage',
+    'answring': 'Maya',
+    'hustle': 'Hustle',
+    'roadie': 'Roadie',
+    'ralph': 'Ralph',
+    'tldr': 'Cliff',
+    'forge': 'Forge',
+    'browser agent': 'Browser Agent',
+    'browser': 'Browser Agent',
+    'code frontend': 'Code Frontend',
+    'code-frontend': 'Code Frontend',
+    'code backend': 'Code Backend',
+    'code-backend': 'Code Backend',
+    'code devops': 'Code DevOps',
+    'code-devops': 'Code DevOps',
+    'docs': 'The Professor',
+    'the professor': 'The Professor',
+  };
+
+  const normalizedMap: Record<string, number> = {};
+  for (const [key, count] of Object.entries(assigneeMap)) {
+    const lookup = key.toLowerCase().trim();
+    const displayName = DISPLAY_NAMES[lookup] || DISPLAY_NAMES[key.replace(/-/g, ' ').toLowerCase().trim()] || key;
+    normalizedMap[displayName] = (normalizedMap[displayName] || 0) + count;
+  }
+
+  const byAssignee = Object.entries(normalizedMap)
     .map(([assignee, count]) => ({ assignee, count }))
     .sort((a, b) => b.count - a.count);
 

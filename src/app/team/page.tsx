@@ -1,481 +1,448 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Users, ChevronRight } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Users, X, Send, Square, Activity } from 'lucide-react';
 
-interface OfficeStation {
-  agent_id: string;
-  agent_name: string;
-  status: string;
-  current_task: string;
-  updated_at: string;
-}
-
-interface AgentMeta {
+interface AgentDef {
   id: string;
   name: string;
+  role: string;
   emoji: string;
-  title: string;
-  tags: string[];
-  accent: string;
+  isLead?: boolean;
 }
 
-const SIR: AgentMeta = {
-  id: 'sir', name: 'Sir', emoji: '👑', title: 'CEO & Owner',
-  tags: ['Leadership', 'Strategy', 'Oversight'], accent: 'yellow',
-};
-
-const BABBAGE: AgentMeta = {
-  id: 'babbage', name: 'Babbage', emoji: '🤖', title: 'Chief of Staff',
-  tags: ['Coordination', 'Planning', 'Delegation'], accent: 'indigo',
-};
-
-const MANAGERS: AgentMeta[] = [
-  { id: 'code-monkey', name: 'Code Monkey', emoji: '🐒', title: 'Engineering Manager',      tags: ['Engineering', 'Delegation', 'Code Review'], accent: 'orange' },
-  { id: 'answring',    name: 'Maya',        emoji: '📞', title: 'Answring Operations Lead', tags: ['Operations', 'Client Services', 'Team Lead'], accent: 'blue'   },
-  { id: 'hustle',      name: 'Hustle',      emoji: '💼', title: 'Business Development',    tags: ['Sales', 'Outreach', 'Growth'],                accent: 'green'  },
-  { id: 'roadie',      name: 'Roadie',      emoji: '🎸', title: 'Content & Creative Lead', tags: ['Content', 'Creative', 'Production'],          accent: 'yellow' },
-];
-
-const RALPH: AgentMeta = {
-  id: 'ralph', name: 'Ralph', emoji: '✅', title: 'Fleet-wide QA Reviewer',
-  tags: ['Quality Assurance', 'Code Review', 'Standards'], accent: 'pink',
-};
-
-const SUPPORT: AgentMeta[] = [
-  { id: 'tldr',    name: 'TLDR',          emoji: '📰', title: 'News & Briefings',          tags: ['Research', 'Summarization', 'Intel'],     accent: 'purple' },
-  { id: 'browser', name: 'Browser Agent', emoji: '🌐', title: 'Web Research & Automation', tags: ['Web', 'Research', 'Automation'],          accent: 'cyan'   },
-  { id: 'comms',   name: 'Comms Agent',   emoji: '📱', title: 'Communications & Messaging', tags: ['Telegram', 'Notifications', 'Messaging'], accent: 'red'    },
-];
-
-const WORKER_GROUPS: { manager: string; agents: AgentMeta[] }[] = [
-  {
-    manager: 'code-monkey',
-    agents: [
-      { id: 'code-frontend', name: 'Code Frontend', emoji: '🎨', title: 'Frontend Engineer', tags: ['React', 'Next.js', 'TypeScript'], accent: 'orange' },
-      { id: 'code-backend',  name: 'Code Backend',  emoji: '⚙️',  title: 'Backend Engineer',  tags: ['Python', 'FastAPI', 'SQLite'],    accent: 'orange' },
-      { id: 'code-devops',   name: 'Code DevOps',   emoji: '🔧', title: 'DevOps Engineer',   tags: ['Docker', 'systemd', 'Deploy'],    accent: 'orange' },
-    ],
-  },
-  {
-    manager: 'answring',
-    agents: [
-      { id: 'answring-ops',        name: 'Olive', emoji: '📊', title: 'Ops Specialist',       tags: ['Operations', 'Process'],   accent: 'blue' },
-      { id: 'answring-dev',        name: 'Dimitri',   emoji: '💻', title: 'Dev Specialist',       tags: ['Development', 'Tools'],    accent: 'blue' },
-      { id: 'answring-marketing',  name: 'Marcus',   emoji: '📣', title: 'Marketing Specialist', tags: ['Marketing', 'Campaigns'],  accent: 'blue' },
-      { id: 'answring-security',   name: 'Sammy',  emoji: '🔒', title: 'Security Specialist',  tags: ['Security', 'Compliance'], accent: 'blue' },
-      { id: 'answring-strategist', name: 'Stella',  emoji: '🧠', title: 'Strategy Specialist',  tags: ['Strategy', 'Analysis'],   accent: 'blue' },
-      { id: 'answring-sales',      name: 'Sal', emoji: '💰', title: 'Sales Specialist',     tags: ['Sales', 'Pipeline'],       accent: 'blue' },
-      { id: 'answring-qa',         name: 'Quinn', emoji: '🔍', title: 'QA Specialist',        tags: ['QA', 'Testing'],           accent: 'blue' },
-    ],
-  },
-];
-
-const ACCENT_TAG: Record<string, string> = {
-  yellow: 'bg-yellow-500/10 border-yellow-500/20 text-yellow-300',
-  indigo: 'bg-indigo-500/10 border-indigo-500/20 text-indigo-300',
-  orange: 'bg-orange-500/10 border-orange-500/20 text-orange-300',
-  blue:   'bg-blue-500/10   border-blue-500/20   text-blue-300',
-  green:  'bg-green-500/10  border-green-500/20  text-green-300',
-  pink:   'bg-pink-500/10   border-pink-500/20   text-pink-300',
-  purple: 'bg-purple-500/10 border-purple-500/20 text-purple-300',
-  cyan:   'bg-cyan-500/10   border-cyan-500/20   text-cyan-300',
-  red:    'bg-red-500/10    border-red-500/20    text-red-300',
-};
-
-const ACCENT_GLOW: Record<string, string> = {
-  yellow: 'shadow-[0_0_20px_rgba(234,179,8,0.2)] border-yellow-500/30',
-  indigo: 'shadow-[0_0_20px_rgba(99,102,241,0.2)] border-indigo-500/30',
-  orange: 'shadow-[0_0_20px_rgba(249,115,22,0.2)] border-orange-500/30',
-  blue:   'shadow-[0_0_20px_rgba(59,130,246,0.2)] border-blue-500/30',
-  green:  'shadow-[0_0_20px_rgba(74,222,128,0.2)] border-green-500/30',
-  pink:   'shadow-[0_0_20px_rgba(236,72,153,0.2)] border-pink-500/30',
-  purple: 'shadow-[0_0_20px_rgba(168,85,247,0.2)] border-purple-500/30',
-  cyan:   'shadow-[0_0_20px_rgba(6,182,212,0.2)] border-cyan-500/30',
-  red:    'shadow-[0_0_20px_rgba(239,68,68,0.2)] border-red-500/30',
-};
-
-const ACCENT_BORDER: Record<string, string> = {
-  orange: 'border-orange-500/20',
-  blue:   'border-blue-500/20',
-  green:  'border-green-500/20',
-  yellow: 'border-yellow-500/20',
-};
-
-function parseUtc(dateStr: string): Date {
-  const iso = dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T') + 'Z';
-  return new Date(iso);
+interface AgentStatus {
+  id: string;
+  name: string;
+  role: string;
+  status: string;
+  lastActiveMs: number;
+  lastTask: string | null;
+  workspace: string;
+  model: string;
+  sessionId: string | null;
 }
 
-function resolveStatus(status: string, updatedAt: string): string {
-  if (status !== 'working') return status;
-  const ageMs = Date.now() - parseUtc(updatedAt).getTime();
-  return ageMs > 3 * 60 * 1000 ? 'idle' : 'working';
+const BABBAGE: AgentDef = { id: 'main', name: 'Babbage', role: 'Chief of Staff', emoji: '🤖' };
+
+const ANSWRING_TEAM: AgentDef[] = [
+  { id: 'answring',            name: 'Maya',    role: 'Team Lead', emoji: '📞', isLead: true },
+  { id: 'answring-sales',      name: 'Sal',     role: 'Sales',     emoji: '💰' },
+  { id: 'answring-qa',         name: 'Quinn',   role: 'QA',        emoji: '🔍' },
+  { id: 'answring-strategist', name: 'Stella',  role: 'Strategy',  emoji: '🧠' },
+  { id: 'answring-ops',        name: 'Opie',    role: 'Ops',       emoji: '📊' },
+  { id: 'answring-dev',        name: 'Devin',   role: 'Dev',       emoji: '💻' },
+  { id: 'answring-marketing',  name: 'Marcus',  role: 'Marketing', emoji: '📣' },
+  { id: 'answring-security',   name: 'Cera',    role: 'Security',  emoji: '🔒' },
+];
+
+const DEV_TEAM: AgentDef[] = [
+  { id: 'code-monkey',   name: 'Code Monkey', role: 'Eng Manager', emoji: '🐒', isLead: true },
+  { id: 'code-frontend', name: 'Frontend',    role: 'Frontend',    emoji: '🎨' },
+  { id: 'code-backend',  name: 'Backend',     role: 'Backend',     emoji: '⚙️' },
+  { id: 'code-devops',   name: 'DevOps',      role: 'DevOps',      emoji: '🔧' },
+  { id: 'code-webdev',   name: 'WebDev',      role: 'WebDev',      emoji: '🖥️' },
+  { id: 'ralph',         name: 'Ralph',       role: 'QA Lead',     emoji: '✅' },
+];
+
+const SPECIALISTS: AgentDef[] = [
+  { id: 'tldr',    name: 'Cliff',         role: 'Digest',          emoji: '📰' },
+  { id: 'browser', name: 'Crawler',       role: 'Web Research',    emoji: '🌐' },
+  { id: 'forge',   name: 'Forge',         role: 'Builder',         emoji: '🔨' },
+  { id: 'hustle',  name: 'Hustle',        role: 'Growth',          emoji: '💼' },
+  { id: 'pixel',   name: 'Pixel',         role: 'Image Generation', emoji: '🎨' },
+  { id: 'roadie',  name: 'Roadie',        role: 'Logistics',       emoji: '🎸' },
+  { id: 'docs',    name: 'The Professor', role: 'Docs & Research', emoji: '📚' },
+];
+
+const ALL_AGENTS = [BABBAGE, ...ANSWRING_TEAM, ...DEV_TEAM, ...SPECIALISTS];
+
+function timeAgo(ms: number): string {
+  if (!ms) return 'Never';
+  const diff = Date.now() - ms;
+  if (diff < 60_000) return 'Just now';
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
+  return `${Math.floor(diff / 86_400_000)}d ago`;
 }
 
-// ── Compact sub-agent card ────────────────────────────────────────────────────
-
-function SubAgentCard({ agent, status, currentTask }: { agent: AgentMeta; status: string; currentTask?: string }) {
-  const isWorking = status === 'working' || status === 'active';
-  const isIdle    = status === 'idle';
-
-  const border = isWorking
-    ? 'border-green-500/40 shadow-[0_0_10px_rgba(74,222,128,0.2)]'
-    : 'border-white/[0.07]';
-  const opacity = !isWorking && !isIdle ? 'opacity-50 grayscale' : isIdle ? 'opacity-70' : '';
-
+function AgentCard({ agent, status, onClick }: { agent: AgentDef; status?: AgentStatus; onClick: () => void }) {
+  const isWorking = status?.status === 'working';
+  const isIdle = !status || status.status === 'idle';
+  const isLead = agent.isLead;
   return (
-    <div className={`flex flex-col gap-2 rounded-xl border p-3 bg-[#1e1e20] transition-all duration-300 min-h-[72px] ${border} ${opacity}`}>
-      <div className="flex items-center gap-2">
+    <button
+      onClick={onClick}
+      className={`group text-left flex flex-col gap-2 rounded-xl border p-3 bg-[#1e1e20] transition-all duration-300 cursor-pointer hover:bg-[#252528] hover:border-white/[0.15] ${isLead ? 'sm:col-span-2 p-4' : ''} ${isWorking ? 'border-green-500/40 shadow-[0_0_12px_rgba(74,222,128,0.2)]' : 'border-white/[0.07]'}`}
+    >
+      <div className="flex items-center gap-2.5">
         <div className="relative flex-shrink-0">
-          {isWorking && (
-            <span className="absolute inset-0 rounded-lg animate-ping bg-green-400/20 pointer-events-none" />
-          )}
-          <div className="relative w-8 h-8 rounded-lg bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-lg z-10">
-            {agent.emoji}
+          {isWorking && <span className="absolute inset-0 rounded-lg animate-ping bg-green-400/20 pointer-events-none" />}
+          <div className={`relative ${isLead ? 'w-10 h-10 text-xl' : 'w-8 h-8 text-lg'} rounded-lg bg-white/[0.06] border border-white/[0.08] flex items-center justify-center z-10`}>
+            <span aria-hidden="true">{agent.emoji}</span>
           </div>
           {isWorking ? (
-            <span className="absolute -bottom-0.5 -right-0.5 z-20 text-[8px] font-black bg-green-500 text-black px-0.5 py-px rounded leading-none tracking-wide uppercase">
-              ON
-            </span>
+            <span className="absolute -bottom-0.5 -right-0.5 z-20 text-[7px] font-black bg-green-500 text-black px-1 py-px rounded leading-none tracking-wide uppercase">LIVE</span>
           ) : (
             <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#1e1e20] z-20 ${isIdle ? 'bg-yellow-400' : 'bg-neutral-600'}`} />
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-bold text-white/90 break-words leading-tight">{agent.name}</p>
-          <p className="text-[10px] text-neutral-500 leading-tight truncate">{agent.title}</p>
+          <p className={`${isLead ? 'text-sm' : 'text-xs'} font-bold text-white/90 leading-tight truncate`}>{agent.name}</p>
+          <p className="text-[10px] text-neutral-500 leading-tight truncate">{agent.role}</p>
         </div>
       </div>
-
-      {isWorking && currentTask && (
-        <div className="pt-1 border-t border-green-500/20">
-          <p className="text-[9px] text-green-300 truncate leading-tight" title={currentTask}>{currentTask}</p>
+      {isWorking && status?.lastTask && (
+        <div className="pt-1.5 border-t border-green-500/20">
+          <p className="text-[9px] text-green-300 truncate leading-tight" title={status.lastTask}>{status.lastTask}</p>
         </div>
       )}
-    </div>
+    </button>
   );
 }
 
-// ── Expandable manager card ───────────────────────────────────────────────────
-
-function ExpandableManagerCard({
-  agent, status, currentTask, subAgents, getInfo,
-}: {
-  agent: AgentMeta;
-  status: string;
-  currentTask?: string;
-  subAgents: AgentMeta[];
-  getInfo: (id: string) => { status: string; currentTask?: string };
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const isWorking = status === 'working' || status === 'active';
-  const isIdle    = status === 'idle';
-
-  const activeSubCount = subAgents.filter(a => {
-    const { status: s } = getInfo(a.id);
-    return s === 'working' || s === 'active';
-  }).length;
-
-  const baseBorder = isWorking
-    ? 'border-green-500/40 shadow-[0_0_15px_rgba(74,222,128,0.25)]'
-    : expanded
-    ? 'border-white/[0.12]'
-    : 'border-white/[0.07]';
-  const opacity = !isWorking && !isIdle ? 'opacity-50 grayscale' : isIdle ? 'opacity-75' : '';
-
+function BabbageCard({ status, onClick }: { status?: AgentStatus; onClick: () => void }) {
+  const isWorking = status?.status === 'working';
+  const isIdle = !status || status.status === 'idle';
   return (
-    <div className={`flex flex-col rounded-2xl border bg-[#252528] transition-all duration-300 ${baseBorder} ${opacity}`}>
-      {/* Clickable header */}
-      <div
-        className="flex flex-col gap-3 p-4 cursor-pointer select-none hover:bg-white/[0.02] transition-colors duration-200 rounded-2xl"
-        onClick={() => setExpanded(v => !v)}
-      >
-        <div className="flex items-start gap-3">
-          <div className="relative flex-shrink-0">
-            {isWorking && (
-              <span className="absolute inset-0 rounded-xl animate-ping bg-green-400/20 pointer-events-none" />
-            )}
-            <div className="relative w-11 h-11 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-2xl z-10">
-              {agent.emoji}
-            </div>
-            {isWorking ? (
-              <span className="absolute -bottom-1 -right-1 z-20 text-[9px] font-black bg-green-500 text-black px-1 py-0.5 rounded leading-none tracking-wide uppercase">
-                LIVE
-              </span>
-            ) : (
-              <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#141414] z-20 ${isIdle ? 'bg-yellow-400' : 'bg-neutral-600'}`} />
-            )}
-          </div>
-
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-white/90 leading-tight">{agent.name}</p>
-            <p className="text-[11px] text-neutral-500 mt-0.5 leading-tight truncate">{agent.title}</p>
-          </div>
-
-          {/* Chevron */}
-          <div className={`flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center transition-all duration-300 ${expanded ? 'bg-white/[0.08] text-white/70' : 'text-neutral-600'}`}>
-            <ChevronRight size={13} className={`transition-transform duration-300 ${expanded ? 'rotate-90' : 'rotate-0'}`} />
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-1">
-          {agent.tags.map(tag => (
-            <span key={tag} className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${ACCENT_TAG[agent.accent]}`}>
-              {tag}
-            </span>
-          ))}
-        </div>
-
-        {isWorking && currentTask && (
-          <div className="pt-2 border-t border-green-500/20">
-            <div className="flex items-center gap-1.5 bg-green-950/40 rounded-md px-2 py-1.5">
-              <span className="text-green-400/60 text-[10px] font-bold uppercase tracking-wide flex-shrink-0">task</span>
-              <p className="text-[10px] text-green-300 truncate leading-tight flex-1" title={currentTask}>{currentTask}</p>
-              <span className="inline-block w-1.5 h-3 bg-green-400 animate-pulse flex-shrink-0 rounded-sm" />
-            </div>
-          </div>
-        )}
-
-        {!expanded && (
-          <p className="text-[10px] text-neutral-600 flex items-center gap-1.5">
-            ↳ {subAgents.length} workers
-            {activeSubCount > 0 && <><span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse inline-block" /> {activeSubCount} active</>}
-          </p>
-        )}
+    <div className="mb-10">
+      <div className="flex items-center gap-2.5 mb-3">
+        <span className="text-base" aria-hidden="true">⭐</span>
+        <h3 className="text-xs font-bold text-neutral-400 tracking-[0.12em] uppercase">Chief of Staff</h3>
       </div>
-
-      {/* Sub-team panel */}
-      <div
-        className="border-t border-white/[0.06]"
-        style={{
-          maxHeight: expanded ? '2000px' : '0px',
-          opacity: expanded ? 1 : 0,
-          overflow: 'hidden',
-          transition: 'max-height 0.4s ease-in-out, opacity 0.3s ease-in-out',
-        }}
+      <button
+        onClick={onClick}
+        className={`group text-left w-full max-w-sm flex items-center gap-4 rounded-2xl border p-5 bg-[#1e1e20] transition-all duration-300 cursor-pointer hover:bg-[#252528] hover:border-white/[0.2] ${isWorking ? 'border-green-500/40 shadow-[0_0_20px_rgba(74,222,128,0.25)]' : 'border-indigo-500/25 shadow-[0_0_20px_rgba(99,102,241,0.1)]'}`}
       >
-        <div className={`mx-3 mb-3 rounded-xl border ${ACCENT_BORDER[agent.accent] ?? 'border-white/[0.07]'} bg-black/20 p-3`}>
-          <p className="text-[10px] font-bold text-neutral-500 tracking-[0.12em] uppercase mb-2.5">
-            Sub-team · {subAgents.length} members
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {subAgents.map(sub => (
-              <SubAgentCard key={sub.id} agent={sub} {...getInfo(sub.id)} />
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Standard grid card ────────────────────────────────────────────────────────
-
-function GridCard({ agent, status, currentTask }: { agent: AgentMeta; status: string; currentTask?: string }) {
-  const isWorking = status === 'working' || status === 'active';
-  const isIdle    = status === 'idle';
-  const border = isWorking ? 'border-green-500/40 shadow-[0_0_15px_rgba(74,222,128,0.25)]' : 'border-white/[0.07]';
-  const opacity = !isWorking && !isIdle ? 'opacity-50 grayscale' : isIdle ? 'opacity-75' : '';
-
-  return (
-    <div className={`flex flex-col gap-3 rounded-2xl border p-4 bg-[#252528] transition-all duration-300 ${border} ${opacity}`}>
-      <div className="flex items-start gap-3">
         <div className="relative flex-shrink-0">
           {isWorking && <span className="absolute inset-0 rounded-xl animate-ping bg-green-400/20 pointer-events-none" />}
-          <div className="relative w-11 h-11 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-2xl z-10">
-            {agent.emoji}
+          <div className="relative w-14 h-14 text-3xl rounded-xl bg-white/[0.07] border border-white/[0.1] flex items-center justify-center z-10">
+            <span aria-hidden="true">🤖</span>
           </div>
           {isWorking ? (
-            <span className="absolute -bottom-1 -right-1 z-20 text-[9px] font-black bg-green-500 text-black px-1 py-0.5 rounded leading-none tracking-wide uppercase">LIVE</span>
+            <span className="absolute -bottom-1 -right-1 z-20 text-[7px] font-black bg-green-500 text-black px-1.5 py-px rounded leading-none tracking-wide uppercase">LIVE</span>
           ) : (
-            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#141414] z-20 ${isIdle ? 'bg-yellow-400' : 'bg-neutral-600'}`} />
+            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#1e1e20] z-20 ${isIdle ? 'bg-yellow-400' : 'bg-neutral-600'}`} />
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-white/90 truncate">{agent.name}</p>
-          <p className="text-[11px] text-neutral-500 mt-0.5 leading-tight truncate">{agent.title}</p>
+          <p className="text-base font-extrabold text-white/95 leading-tight">Babbage</p>
+          <p className="text-xs text-indigo-400/80 leading-tight mt-0.5">Chief of Staff</p>
+          {isWorking && status?.lastTask && (
+            <p className="text-[10px] text-green-300 truncate leading-tight mt-1.5" title={status.lastTask}>{status.lastTask}</p>
+          )}
         </div>
-      </div>
-      <div className="flex flex-wrap gap-1">
-        {agent.tags.map(tag => (
-          <span key={tag} className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${ACCENT_TAG[agent.accent]}`}>{tag}</span>
-        ))}
-      </div>
-      {isWorking && currentTask && (
-        <div className="mt-auto pt-2 border-t border-green-500/20">
-          <div className="flex items-center gap-1.5 bg-green-950/40 rounded-md px-2 py-1.5">
-            <span className="text-green-400/60 text-[10px] font-bold uppercase tracking-wide flex-shrink-0">task</span>
-            <p className="text-[10px] text-green-300 truncate leading-tight flex-1" title={currentTask}>{currentTask}</p>
-            <span className="inline-block w-1.5 h-3 bg-green-400 animate-pulse flex-shrink-0 rounded-sm" />
-          </div>
-        </div>
-      )}
+      </button>
     </div>
   );
 }
 
-// ── Wide card ─────────────────────────────────────────────────────────────────
+function AgentCommandPanel({ agent, status, onClose }: { agent: AgentDef; status?: AgentStatus; onClose: () => void }) {
+  const isWorking = status?.status === 'working';
+  const [feedData, setFeedData] = useState<string[]>([]);
+  const [feedLoading, setFeedLoading] = useState(true);
+  const [dmMessage, setDmMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sentFeedback, setSentFeedback] = useState(false);
+  const [stopping, setStopping] = useState(false);
+  const feedRef = useRef<HTMLDivElement>(null);
+  const prevFeedLenRef = useRef(0);
 
-function WideCard({ agent, status, currentTask }: { agent: AgentMeta; status: string; currentTask?: string }) {
-  const isOwner   = agent.id === 'sir';
-  const isWorking = !isOwner && (status === 'working' || status === 'active');
-  const isIdle    = !isOwner && status === 'idle';
-  const border = isWorking
-    ? 'border-green-500/40 shadow-[0_0_20px_rgba(74,222,128,0.25)]'
-    : isOwner ? `border-yellow-500/20 ${ACCENT_GLOW[agent.accent]}` : 'border-white/[0.07]';
-  const opacity = !isOwner && !isWorking && !isIdle ? 'opacity-50 grayscale' : isIdle ? 'opacity-75' : '';
+  // Fetch feed
+  const fetchFeed = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/agents/${agent.id}/feed?limit=30`);
+      const data = await res.json();
+      if (data.lines && Array.isArray(data.lines)) {
+        setFeedData(data.lines);
+      }
+    } catch { /* silent */ }
+    setFeedLoading(false);
+  }, [agent.id]);
+
+  useEffect(() => {
+    fetchFeed();
+    const id = setInterval(fetchFeed, 5_000);
+    return () => clearInterval(id);
+  }, [fetchFeed]);
+
+  // Auto-scroll feed on new content
+  useEffect(() => {
+    if (feedData.length > prevFeedLenRef.current && feedRef.current) {
+      feedRef.current.scrollTop = feedRef.current.scrollHeight;
+    }
+    prevFeedLenRef.current = feedData.length;
+  }, [feedData]);
+
+  const handleStop = async () => {
+    setStopping(true);
+    try {
+      await fetch(`/api/agents/${agent.id}/stop`, { method: 'POST' });
+    } catch { /* silent */ }
+    setStopping(false);
+  };
+
+  const handleSend = async () => {
+    if (!dmMessage.trim()) return;
+    setSending(true);
+    try {
+      await fetch(`/api/agents/${agent.id}/message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: dmMessage.trim() }),
+      });
+      setDmMessage('');
+      setSentFeedback(true);
+      setTimeout(() => setSentFeedback(false), 2000);
+    } catch { /* silent */ }
+    setSending(false);
+  };
 
   return (
-    <div className={`flex items-center gap-5 rounded-2xl border p-5 bg-[#252528] transition-all duration-300 ${border} ${opacity}`}>
-      <div className="relative flex-shrink-0">
-        {isWorking && <span className="absolute inset-0 rounded-2xl animate-ping bg-green-400/20 pointer-events-none" />}
-        <div className="relative w-14 h-14 rounded-2xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-3xl z-10">{agent.emoji}</div>
-        {!isOwner && (isWorking ? (
-          <span className="absolute -bottom-1 -right-1 z-20 text-[9px] font-black bg-green-500 text-black px-1 py-0.5 rounded leading-none tracking-wide uppercase">LIVE</span>
-        ) : (
-          <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#141414] z-20 ${isIdle ? 'bg-yellow-400' : 'bg-neutral-600'}`} />
-        ))}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-base font-bold text-white">{agent.name}</p>
-        <p className="text-xs text-neutral-500 mt-0.5">{agent.title}</p>
-        <div className="flex flex-wrap gap-1.5 mt-2.5">
-          {agent.tags.map(tag => (
-            <span key={tag} className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${ACCENT_TAG[agent.accent]}`}>{tag}</span>
-          ))}
-        </div>
-      </div>
-      {isWorking && currentTask && (
-        <div className="flex-shrink-0 max-w-xs">
-          <div className="flex items-center gap-1.5 bg-green-950/40 rounded-lg px-3 py-2">
-            <span className="text-green-400/60 text-[10px] font-bold uppercase tracking-wide flex-shrink-0">task</span>
-            <p className="text-[11px] text-green-300 truncate leading-tight flex-1" title={currentTask}>{currentTask}</p>
-            <span className="inline-block w-1.5 h-3 bg-green-400 animate-pulse flex-shrink-0 rounded-sm" />
+    <div className="fixed inset-0 z-50" onClick={onClose}>
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+
+      {/* Slide-out panel */}
+      <div
+        className="absolute top-0 right-0 bottom-0 w-full sm:w-[480px] bg-[#1a1a1c] border-l border-white/[0.1] shadow-2xl overflow-y-auto animate-slide-in-right"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="p-6 flex flex-col gap-5">
+          {/* 1. Header */}
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-2xl">
+                <span aria-hidden="true">{agent.emoji}</span>
+              </div>
+              <div>
+                <h3 className="text-xl font-extrabold text-white">{agent.name}</h3>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-xs text-neutral-400">{agent.role}</span>
+                  {isWorking ? (
+                    <span className="text-[9px] font-black bg-green-500 text-black px-1.5 py-0.5 rounded leading-none tracking-wide uppercase">LIVE</span>
+                  ) : (
+                    <span className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full bg-yellow-400" />
+                      <span className="text-[10px] text-yellow-400/80">Idle</span>
+                    </span>
+                  )}
+                </div>
+                {status?.model && (
+                  <p className="text-[10px] font-mono text-neutral-500 mt-1">{status.model}</p>
+                )}
+              </div>
+            </div>
+            <button onClick={onClose} className="w-7 h-7 rounded-lg bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/[0.1] transition-colors flex-shrink-0">
+              <X size={14} />
+            </button>
+          </div>
+
+          {/* 2. Stop Button */}
+          {status?.sessionId && (
+            <button
+              onClick={handleStop}
+              disabled={stopping}
+              className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 disabled:bg-red-800 disabled:opacity-60 text-white font-bold text-sm rounded-lg px-4 py-2.5 transition-colors"
+            >
+              <Square size={14} />
+              {stopping ? 'Stopping...' : 'Stop Agent'}
+            </button>
+          )}
+
+          {/* 3. Send Message */}
+          <div>
+            <p className="text-[10px] font-bold text-neutral-500 tracking-wider uppercase mb-2">Send Message</p>
+            <div className="flex gap-2">
+              <textarea
+                value={dmMessage}
+                onChange={e => setDmMessage(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                rows={2}
+                placeholder="Type a message..."
+                className="flex-1 bg-black/40 border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-neutral-200 placeholder:text-neutral-600 resize-none focus:outline-none focus:border-indigo-500/50 transition-colors"
+              />
+              <button
+                onClick={handleSend}
+                disabled={sending || !dmMessage.trim()}
+                className="self-end bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 disabled:opacity-50 text-white rounded-lg px-3 py-2 transition-colors flex-shrink-0"
+              >
+                {sentFeedback ? (
+                  <span className="text-xs font-bold">Sent ✓</span>
+                ) : (
+                  <Send size={14} />
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* 4. Current Task */}
+          <div>
+            <p className="text-[10px] font-bold text-neutral-500 tracking-wider uppercase mb-2">Current Task</p>
+            {status?.lastTask ? (
+              <div className="bg-green-950/30 border border-green-500/20 rounded-lg p-3">
+                <p className="text-xs text-green-300 leading-relaxed">{status.lastTask}</p>
+                {status.lastActiveMs > 0 && (
+                  <p className="text-[9px] text-green-500/60 mt-1.5">{timeAgo(Date.now() - status.lastActiveMs)}</p>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-neutral-500">No active task</p>
+            )}
+          </div>
+
+          {/* 5. Live Feed */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <p className="text-[10px] font-bold text-neutral-500 tracking-wider uppercase">Live Feed</p>
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" title="Auto-refreshing every 5s" />
+            </div>
+            <div
+              ref={feedRef}
+              className="max-h-64 overflow-y-auto bg-black/40 rounded-lg p-3 font-mono text-[10px] text-neutral-300 scrollbar-thin"
+            >
+              {feedLoading ? (
+                <p className="text-neutral-500">Loading feed...</p>
+              ) : feedData.length === 0 ? (
+                <p className="text-neutral-500">No activity yet</p>
+              ) : (
+                feedData.map((line, i) => (
+                  <div key={i} className="py-0.5 border-b border-white/[0.03] last:border-0 break-words">{line}</div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* 6. Metadata Footer */}
+          <div className="border-t border-white/[0.08] pt-4">
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <p className="text-[9px] font-bold text-neutral-600 tracking-wider uppercase mb-0.5">Workspace</p>
+                <p className="text-[10px] font-mono text-neutral-400 truncate" title={status?.workspace ? (status.workspace.split('/').pop() || status.workspace) : 'N/A'}>{status?.workspace ? (status.workspace.split('/').pop() || status.workspace) : 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-[9px] font-bold text-neutral-600 tracking-wider uppercase mb-0.5">Session</p>
+                <p className="text-[10px] font-mono text-neutral-400 truncate" title={status?.sessionId || 'N/A'}>{status?.sessionId ? `${status.sessionId.slice(0, 12)}...` : 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-[9px] font-bold text-neutral-600 tracking-wider uppercase mb-0.5">Last Active</p>
+                <p className="text-[10px] text-neutral-400">{status?.lastActiveMs ? timeAgo(Date.now() - status.lastActiveMs) : 'Unknown'}</p>
+              </div>
+            </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
 
-// ── Flow label ────────────────────────────────────────────────────────────────
-
-function FlowLabel({ label }: { label: string }) {
+function DetailRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="flex flex-col items-center py-1">
-      <div className="w-px h-5 bg-white/10" />
-      <span className="text-[10px] font-bold text-neutral-500 tracking-[0.15em] uppercase px-3 py-1 rounded-full border border-white/[0.06] bg-[#1a1a1c]">{label}</span>
-      <div className="w-px h-5 bg-white/10" />
+    <div className="flex items-baseline justify-between gap-4">
+      <p className="text-[10px] font-bold text-neutral-500 tracking-wider uppercase flex-shrink-0">{label}</p>
+      <p className={`text-xs text-neutral-300 truncate text-right ${mono ? 'font-mono text-[11px]' : ''}`} title={value}>{value}</p>
     </div>
   );
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
+function TeamGroup({ icon, title, agents, statusMap, onInspect }: { icon: string; title: string; agents: AgentDef[]; statusMap: Map<string, AgentStatus>; onInspect: (agent: AgentDef) => void }) {
+  const activeCount = agents.filter(a => statusMap.get(a.id)?.status === 'working').length;
+  return (
+    <div>
+      <div className="flex items-center gap-2.5 mb-3">
+        <span className="text-base" aria-hidden="true">{icon}</span>
+        <h3 className="text-xs font-bold text-neutral-400 tracking-[0.12em] uppercase">{title}</h3>
+        {activeCount > 0 && (
+          <span className="flex items-center gap-1 bg-green-950/40 border border-green-500/30 rounded px-1.5 py-0.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+            <span className="text-[10px] font-bold text-green-400">{activeCount}</span>
+          </span>
+        )}
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+        {[...agents].sort((a, b) => { if (a.isLead && !b.isLead) return -1; if (!a.isLead && b.isLead) return 1; return a.name.localeCompare(b.name); }).map(agent => (
+          <AgentCard key={agent.id} agent={agent} status={statusMap.get(agent.id)} onClick={() => onInspect(agent)} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function TeamPage() {
-  const [stations, setStations] = useState<OfficeStation[]>([]);
+  const [statusMap, setStatusMap] = useState<Map<string, AgentStatus>>(new Map());
+  const [lastFetchTime, setLastFetchTime] = useState<number>(0);
+  const [inspecting, setInspecting] = useState<AgentDef | null>(null);
+  const initialLoadedRef = useRef(false);
 
-  const fetchStations = useCallback(async () => {
+  const fetchStatus = useCallback(async () => {
     try {
-      const res  = await fetch('/api/agent-status');
-      const data = await res.json();
-      if (Array.isArray(data)) { setStations(data); return; }
-    } catch { /* try fallback */ }
-    try {
-      const res  = await fetch('/api/office');
-      const data: OfficeStation[] = await res.json();
-      setStations(data);
+      const res = await fetch('/api/office');
+      const raw = await res.json();
+      const data: AgentStatus[] = Array.isArray(raw) ? raw : raw.agents || [];
+      if (data.length >= 0) {
+        const map = new Map<string, AgentStatus>();
+        for (const agent of data) map.set(agent.id, agent);
+        setStatusMap(map);
+        setLastFetchTime(Date.now());
+      }
     } catch { /* silent */ }
   }, []);
 
-  useEffect(() => { fetchStations(); }, [fetchStations]);
   useEffect(() => {
-    const id = setInterval(fetchStations, 15000);
+    if (initialLoadedRef.current) return;
+    initialLoadedRef.current = true;
+    fetchStatus();
+  }, [fetchStatus]);
+
+  useEffect(() => {
+    const id = setInterval(fetchStatus, 15_000);
     return () => clearInterval(id);
-  }, [fetchStations]);
+  }, [fetchStatus]);
 
-  const getInfo = (agentId: string): { status: string; currentTask?: string } => {
-    if (agentId === 'sir') return { status: 'owner' };
-    const s = stations.find(st => st.agent_id === agentId);
-    if (!s) return { status: 'idle' };
-    const resolved = resolveStatus(s.status, s.updated_at ?? new Date().toISOString());
-    return { status: resolved, currentTask: s.current_task || undefined };
-  };
-
-  const isActive = (id: string) => { const { status } = getInfo(id); return status === 'working' || status === 'active'; };
-
-  const namedAgents = [SIR, BABBAGE, ...MANAGERS, RALPH, ...SUPPORT];
-  const activeCount = namedAgents.filter(a => isActive(a.id)).length;
-  const idleCount   = namedAgents.filter(a => getInfo(a.id).status === 'idle').length;
-  const totalWorkers = WORKER_GROUPS.reduce((n, g) => n + g.agents.length, 0);
-  const activeWorkerCount = WORKER_GROUPS.flatMap(g => g.agents).filter(a => isActive(a.id)).length;
-
-  const expandableIds = new Set(WORKER_GROUPS.map(g => g.manager));
-  const getSubAgents = (id: string) => WORKER_GROUPS.find(g => g.manager === id)?.agents ?? [];
+  const totalAgents = ALL_AGENTS.length;
+  const activeCount = ALL_AGENTS.filter(a => statusMap.get(a.id)?.status === 'working').length;
+  const updatedAgo = lastFetchTime ? timeAgo(lastFetchTime) : '...';
 
   return (
-    <div className="max-w-4xl mx-auto px-4 pb-16">
-      <div className="flex items-center justify-between mb-10">
+    <div className="max-w-5xl mx-auto px-4 pb-16">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-indigo-500/15 flex items-center justify-center">
             <Users size={16} className="text-indigo-400" />
           </div>
           <div>
-            <h2 className="text-2xl font-extrabold gradient-text tracking-tight">Agent Team</h2>
-            <p className="text-xs text-neutral-500">Fleet hierarchy · live status · 15s refresh</p>
+            <h2 className="text-2xl font-extrabold gradient-text tracking-tight">Agent Fleet</h2>
+            <p className="text-xs text-neutral-500">{totalAgents} agents · Updated {updatedAgo}</p>
           </div>
         </div>
-        <div className="flex items-center gap-5">
-          <div className="flex items-center gap-2 bg-green-950/40 border border-green-500/30 rounded-lg px-3 py-1.5 shadow-[0_0_10px_rgba(74,222,128,0.15)]">
-            <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse flex-shrink-0" />
-            <span className="text-sm font-black text-green-400">{activeCount} LIVE</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-yellow-400" />
-            <span className="text-[10px] text-neutral-500">{idleCount} Idle</span>
-          </div>
+        <div className="flex items-center gap-4">
+          {activeCount > 0 && (
+            <div className="flex items-center gap-2 bg-green-950/40 border border-green-500/30 rounded-lg px-3 py-1.5 shadow-[0_0_10px_rgba(74,222,128,0.15)]">
+              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse flex-shrink-0" />
+              <span className="text-sm font-black text-green-400">{activeCount} LIVE</span>
+            </div>
+          )}
+          <span className="text-xs font-mono text-neutral-600">{totalAgents} total</span>
         </div>
       </div>
 
-      <div className="flex flex-col">
-        <WideCard agent={SIR} {...getInfo(SIR.id)} />
-        <FlowLabel label="↓ COMMAND" />
-        <WideCard agent={BABBAGE} {...getInfo(BABBAGE.id)} />
-        <FlowLabel label="⚙ OPERATIONS" />
+      {/* Babbage — Chief of Staff */}
+      <BabbageCard status={statusMap.get(BABBAGE.id)} onClick={() => setInspecting(BABBAGE)} />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {MANAGERS.map(a =>
-            expandableIds.has(a.id) ? (
-              <ExpandableManagerCard
-                key={a.id}
-                agent={a}
-                {...getInfo(a.id)}
-                subAgents={getSubAgents(a.id)}
-                getInfo={getInfo}
-              />
-            ) : (
-              <GridCard key={a.id} agent={a} {...getInfo(a.id)} />
-            )
-          )}
-        </div>
+      {/* Divider */}
+      <div className="border-t border-white/[0.06] mb-8" />
 
-        <div className="mt-3 ml-1">
-          {activeWorkerCount > 0 ? (
-            <p className="text-[11px] text-green-400/70 font-medium">↳ {activeWorkerCount} worker{activeWorkerCount !== 1 ? 's' : ''} active · click manager cards to expand</p>
-          ) : (
-            <p className="text-[11px] text-neutral-600">↳ {totalWorkers} workers on standby · click manager cards to expand</p>
-          )}
-        </div>
-
-        <FlowLabel label="🔍 QA LAYER" />
-        <WideCard agent={RALPH} {...getInfo(RALPH.id)} />
-        <FlowLabel label="⚡ SUPPORT" />
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {SUPPORT.map(a => <GridCard key={a.id} agent={a} {...getInfo(a.id)} />)}
-        </div>
+      {/* Team Groups */}
+      <div className="flex flex-col gap-8">
+        <TeamGroup icon="📞" title="Answring" agents={ANSWRING_TEAM} statusMap={statusMap} onInspect={setInspecting} />
+        <TeamGroup icon="💻" title="Dev Team" agents={DEV_TEAM} statusMap={statusMap} onInspect={setInspecting} />
+        <TeamGroup icon="🔧" title="Specialists" agents={SPECIALISTS} statusMap={statusMap} onInspect={setInspecting} />
       </div>
+
+      {inspecting && statusMap.size > 0 && (
+        <AgentCommandPanel agent={inspecting} status={statusMap.get(inspecting.id)} onClose={() => setInspecting(null)} />
+      )}
     </div>
   );
 }

@@ -1,95 +1,142 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { MAIN_AGENT_ALIAS, MAIN_AGENT_NAME } from '@/config';
-import db from '@/lib/db';
+import { NextResponse } from 'next/server';
+import fs from 'fs';
+import path from 'path';
 
-interface SessionData {
-  agent_id: string;
-  agent_name: string;
-  status: string;
+const HOME = process.env.HOME || '/home/w0lf';
+const OPENCLAW_JSON = path.join(HOME, '.openclaw', 'openclaw.json');
+const AGENTS_DIR = path.join(HOME, '.openclaw', 'agents');
+
+// Map agent IDs to their on-disk directory names (some differ)
+const AGENT_DIR_MAP: Record<string, string> = {
+  'code-monkey': 'dev',
+  'main': 'main',
+  'answring': 'answring',
+  'tldr': 'tldr',
+  'roadie': 'roadie',
+  'hustle': 'hustle',
+  'forge': 'forge',
+  'docs': 'docs',
+  'ralph': 'ralph',
+  'browser': 'browser',
+  'answring-ops': 'answring-ops',
+  'answring-marketing': 'answring-marketing',
+  'answring-dev': 'answring-dev',
+  'answring-security': 'answring-security',
+  'answring-strategist': 'answring-strategist',
+  'answring-sales': 'answring-sales',
+  'answring-qa': 'answring-qa',
+};
+
+// Short role labels
+const ROLE_MAP: Record<string, string> = {
+  'main': 'Chief of Staff',
+  'answring': 'Answring Lead',
+  'answring-ops': 'Ops',
+  'answring-marketing': 'Marketing',
+  'answring-dev': 'Dev',
+  'answring-strategist': 'Strategist',
+  'answring-sales': 'Sales',
+  'answring-qa': 'QA',
+  'answring-security': 'Security',
+  'tldr': 'Digest',
+  'roadie': 'Roadie',
+  'hustle': 'Growth',
+  'code-monkey': 'Eng Manager',
+  'code-frontend': 'Frontend',
+  'code-backend': 'Backend',
+  'code-devops': 'DevOps',
+  'code-webdev': 'WebDev',
+  'ralph': 'QA Lead',
+  'forge': 'Builder',
+  'docs': 'Professor',
+  'browser': 'Crawler',
+};
+
+// Read sessions.json to find the most recently active session
+function getSessionStatus(agentId: string): { isWorking: boolean; lastActiveMs: number; sessionId?: string } {
+  const dirName = AGENT_DIR_MAP[agentId] || agentId;
+  const sessionsJsonPath = path.join(AGENTS_DIR, dirName, 'sessions', 'sessions.json');
+  const WORKING_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+  const now = Date.now();
+
+  try {
+    const raw = JSON.parse(fs.readFileSync(sessionsJsonPath, 'utf-8'));
+    let latestMs = 0;
+    let latestSessionId = '';
+
+    for (const [key, val] of Object.entries(raw as Record<string, any>)) {
+      if (key.includes(':watercooler')) continue; // skip watercooler
+      const updatedAt = val?.updatedAt || 0;
+      if (updatedAt > latestMs) {
+        latestMs = updatedAt;
+        latestSessionId = val?.sessionId || '';
+      }
+    }
+
+    if (latestMs > 0 && (now - latestMs) < WORKING_THRESHOLD_MS) {
+      return { isWorking: true, lastActiveMs: latestMs, sessionId: latestSessionId };
+    }
+    return { isWorking: false, lastActiveMs: latestMs, sessionId: latestSessionId };
+  } catch {
+    return { isWorking: false, lastActiveMs: 0 };
+  }
+}
+
+// Read last few lines of a session JSONL to get last task
+function getLastTask(agentId: string, sessionId: string): string {
+  const dirName = AGENT_DIR_MAP[agentId] || agentId;
+  const filePath = path.join(AGENTS_DIR, dirName, 'sessions', `${sessionId}.jsonl`);
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const lines = content.split('\n').filter(l => l.trim()).slice(-30);
+    for (let i = lines.length - 1; i >= 0; i--) {
+      try {
+        const entry = JSON.parse(lines[i]);
+        const msg = entry.type === 'message' ? entry.message : entry;
+        if (msg?.role === 'assistant' && Array.isArray(msg.content)) {
+          for (const part of msg.content) {
+            if (part.type === 'text' && part.text?.length > 10) {
+              const t = part.text.split('\n').find((l: string) =>
+                l.trim().length > 10 && !l.startsWith('#') && !l.startsWith('---')
+              );
+              if (t) return t.slice(0, 120);
+            }
+          }
+        }
+      } catch {}
+    }
+  } catch {}
+  return '';
 }
 
 export async function GET() {
-  // Get all office_status rows
-  const rows = db.prepare('SELECT * FROM office_status ORDER BY updated_at DESC').all() as {
-    agent_id: string;
-    agent_name: string;
-    role: string;
-    current_task: string;
-    status: string;
-    updated_at: string;
-  }[];
-
-  // Sync with live session data on every read — server-side, no browser needed
   try {
-    const res = await fetch('http://localhost:3001/api/sessions', { cache: 'no-store' });
-    if (res.ok) {
-      const sessions: SessionData[] = await res.json();
-      // Find agents with at least one active session
-      const activeAgentIds = new Set(
-        sessions
-          .filter(s => s.status === 'active')
-          .map(s => s.agent_id === 'main' ? MAIN_AGENT_ALIAS : s.agent_id)
-      );
-      // Update DB: force idle for agents with no active session
-      for (const row of rows) {
-        const shouldBeWorking = activeAgentIds.has(row.agent_id);
-        const isWorking = row.status === 'working';
-        if (!shouldBeWorking && isWorking) {
-          db.prepare(
-            `UPDATE office_status SET status = 'idle', current_task = '', updated_at = datetime('now') WHERE agent_id = ?`
-          ).run(row.agent_id);
-          row.status = 'idle';
-          row.current_task = '';
-        } else if (shouldBeWorking && !isWorking) {
-          // Active session but DB says idle — mark working
-          db.prepare(
-            `UPDATE office_status SET status = 'working', updated_at = datetime('now') WHERE agent_id = ?`
-          ).run(row.agent_id);
-          row.status = 'working';
-        }
-      }
-      return NextResponse.json(
-        rows.map(row => ({
-          ...row,
-          status: activeAgentIds.has(row.agent_id) ? 'working' : row.status,
-        }))
-      );
-    }
-  } catch {
-    // Fall through to raw DB data
+    const config = JSON.parse(fs.readFileSync(OPENCLAW_JSON, 'utf-8'));
+    const agentList: any[] = (config.agents?.list || []).filter((a: any) => a.id && a.id !== 'defaults');
+
+    const agents = agentList.map((a: any) => {
+      const id = a.id;
+      const sessionStatus = getSessionStatus(id);
+      const lastTask = sessionStatus.isWorking && sessionStatus.sessionId
+        ? getLastTask(id, sessionStatus.sessionId)
+        : '';
+
+      return {
+        id,
+        name: a.name || id,
+        role: ROLE_MAP[id] || 'Agent',
+        status: sessionStatus.isWorking ? 'working' : 'idle',
+        lastActiveMs: sessionStatus.lastActiveMs,
+        lastTask: lastTask || null,
+        workspace: a.workspace || '',
+        model: a.model?.primary || config.agents?.defaults?.model?.primary || '',
+        sessionId: sessionStatus.sessionId || null,
+      };
+    });
+
+    return NextResponse.json(agents);
+  } catch (err) {
+    console.error('agent-status error:', err);
+    return NextResponse.json([]);
   }
-
-  return NextResponse.json(rows);
-}
-
-export async function POST(req: NextRequest) {
-  const body = await req.json() as {
-    agent_id: string;
-    agent_name: string;
-    status: string;
-    current_task?: string;
-  };
-
-  // Normalize "main" → alias so duplicate rows never appear
-  const normalizedId = body.agent_id === 'main' ? MAIN_AGENT_ALIAS : body.agent_id;
-  const normalizedName = (normalizedId === MAIN_AGENT_ALIAS) ? MAIN_AGENT_NAME : body.agent_name;
-  const agent_id = normalizedId;
-  const agent_name = normalizedName;
-  const { status, current_task = '' } = body;
-
-  if (!agent_id || !agent_name || !status) {
-    return NextResponse.json({ error: 'Missing required fields: agent_id, agent_name, status' }, { status: 400 });
-  }
-
-  db.prepare(`
-    INSERT INTO office_status (agent_id, agent_name, role, current_task, status)
-    VALUES (?, ?, '', ?, ?)
-    ON CONFLICT(agent_id) DO UPDATE SET
-      agent_name = excluded.agent_name,
-      current_task = excluded.current_task,
-      status = excluded.status,
-      updated_at = datetime('now')
-  `).run(agent_id, agent_name, current_task, status);
-
-  return NextResponse.json({ ok: true });
 }

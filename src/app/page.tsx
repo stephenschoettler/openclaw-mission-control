@@ -1,19 +1,29 @@
 'use client';
-{/* pipeline-test-ok */}
-{/* pipeline-test-2-ok */}
-{/* pipeline-test-3-ok */}
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { CheckSquare, CalendarDays, Inbox, Activity, Clock, Users, TrendingUp, AlertCircle, DollarSign, Server } from 'lucide-react';
+import { ListTodo, CalendarDays, Inbox, Activity, Users, TrendingUp, AlertCircle, DollarSign, Server, Zap } from 'lucide-react';
 
-interface OfficeStation {
+interface AgentStation {
   agent_id: string;
   agent_name: string;
   status: string;
   current_task: string;
-  updated_at: string;
+  lastActiveMs: number;
+  model: string;
+  totalTokens: number;
+  contextTokens: number;
 }
+
+const DISPLAY_NAMES: Record<string, string> = {
+  main: 'Babbage', answring: 'Maya', 'answring-sales': 'Sal',
+  'answring-qa': 'Quinn', 'answring-strategist': 'Stella', 'answring-ops': 'Opie',
+  'answring-dev': 'Devin', 'answring-marketing': 'Marcus', 'answring-security': 'Cera',
+  'code-monkey': 'Code Monkey', 'code-frontend': 'Frontend', 'code-backend': 'Backend',
+  'code-devops': 'DevOps', 'code-webdev': 'WebDev', ralph: 'Ralph', tldr: 'Cliff',
+  browser: 'Crawler', forge: 'Forge', hustle: 'Hustle', roadie: 'Roadie', docs: 'The Professor',
+  pixel: 'Pixel',
+};
 
 interface ApprovalItem {
   id: number;
@@ -23,14 +33,16 @@ interface ApprovalItem {
   status: string;
 }
 
-interface ActivityEntry {
-  id: number;
+interface LiveSession {
+  id: string;
   agent_id: string;
   agent_name: string;
-  event_type: string;
-  title: string;
-  detail: string | null;
-  created_at: string;
+  model: string | null;
+  totalTokens: number;
+  contextTokens: number;
+  contextPct: number | null;
+  ageMs: number;
+  sessionId: string;
 }
 
 interface CalendarEvent {
@@ -38,12 +50,6 @@ interface CalendarEvent {
   title: string;
   date: string;
   time: string;
-}
-
-interface Task {
-  id: number;
-  status: string;
-  updated_at: string;
 }
 
 interface GatewayInfo {
@@ -58,51 +64,33 @@ interface GatewayInfo {
   skills_count: number;
 }
 
-const EVENT_COLORS: Record<string, string> = {
-  task_start:    'text-indigo-400 bg-indigo-500/15',
-  task_end:      'text-green-400 bg-green-500/15',
-  spawn:         'text-purple-400 bg-purple-500/15',
-  message:       'text-blue-400 bg-blue-500/15',
-  approval:      'text-amber-400 bg-amber-500/15',
-  status_change: 'text-cyan-400 bg-cyan-500/15',
-  system:        'text-neutral-400 bg-neutral-500/10',
-};
-
-const AGENT_EMOJIS: Record<string, string> = {
-  'babbage': '🧠', 'code-monkey': '🐒', 'code-frontend': '🎨',
-  'code-backend': '⚙️', 'code-devops': '🛠️', 'ralph': '🔍', 'system': '🖥️',
-};
-
-function getAgentEmoji(agentId: string): string {
-  const lower = agentId.toLowerCase();
-  for (const [key, emoji] of Object.entries(AGENT_EMOJIS)) {
-    if (lower.includes(key)) return emoji;
-  }
-  return '🤖';
+interface TodoItem {
+  title: string;
+  date: string;
+  action: string;
+  problem: string;
+  files: string;
+  solution: string;
 }
 
-function parseUtc(dateStr: string): Date {
-  // SQLite timestamps are UTC "YYYY-MM-DD HH:MM:SS" — append 'Z' to force UTC parsing.
+interface AgentTodos {
+  agentId: string;
+  workspacePath: string;
+  todos: TodoItem[];
+}
+
+function parseUtc(dateStr: string | null | undefined): Date {
+  if (!dateStr) return new Date(0);
   const iso = dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T') + 'Z';
   return new Date(iso);
 }
 
-/** If an agent is "working" but updated_at is >10 min old, treat as idle in UI */
-function resolveStatus(status: string, updatedAt: string): string {
-  if (status !== 'working') return status;
-  const ageMs = Date.now() - parseUtc(updatedAt).getTime();
-  return ageMs > 3 * 60 * 1000 ? 'idle' : 'working';
-}
-
-function relativeTime(dateStr: string): string {
-  const diff = Date.now() - parseUtc(dateStr).getTime();
-  const s = Math.floor(diff / 1000);
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
+function timeAgoMs(ms: number): string {
+  if (!ms) return 'Never';
+  if (ms < 60000) return 'just now';
+  if (ms < 3600000) return `${Math.floor(ms / 60000)}m ago`;
+  if (ms < 86400000) return `${Math.floor(ms / 3600000)}h ago`;
+  return `${Math.floor(ms / 86400000)}d ago`;
 }
 
 function formatEventDate(date: string, time: string): string {
@@ -111,35 +99,55 @@ function formatEventDate(date: string, time: string): string {
     (time ? ` · ${time}` : '');
 }
 
+function shortModel(model: string): string {
+  if (!model) return '?';
+  return model.replace('claude-', '').replace(/-\d+$/, '');
+}
+
 export default function CommandCenterPage() {
-  const [stations, setStations] = useState<OfficeStation[]>([]);
+  const [stations, setStations] = useState<AgentStation[]>([]);
   const [approvals, setApprovals] = useState<ApprovalItem[]>([]);
-  const [activity, setActivity] = useState<ActivityEntry[]>([]);
+  const [liveSessions, setLiveSessions] = useState<LiveSession[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [agentTodos, setAgentTodos] = useState<AgentTodos[]>([]);
   const [hasEvents, setHasEvents] = useState(false);
   const [gateway, setGateway] = useState<GatewayInfo | null>(null);
   const [todayCost, setTodayCost] = useState<number | null>(null);
 
   const fetchAll = useCallback(async () => {
     try {
-      const [oRes, aRes, actRes, eRes, tRes, gwRes, costRes] = await Promise.all([
+      const [oRes, aRes, liveRes, eRes, tRes, gwRes, costRes] = await Promise.all([
         fetch('/api/office'),
         fetch('/api/approvals?status=pending'),
-        fetch('/api/activity'),
+        fetch('/api/activity/live'),
         fetch('/api/events').catch(() => null),
-        fetch('/api/tasks'),
+        fetch('/api/todos'),
         fetch('/api/gateway').catch(() => null),
         fetch('/api/costs').catch(() => null),
       ]);
 
-      if (oRes.ok) setStations(await oRes.json());
-      if (aRes.ok) setApprovals(await aRes.json());
-      if (actRes.ok) {
-        const actData: ActivityEntry[] = await actRes.json();
-        setActivity(actData.slice(0, 5));
+      if (oRes.ok) {
+        const oData = await oRes.json();
+        const agents = Array.isArray(oData) ? oData : oData.agents || [];
+        setStations(agents.map((a: any) => ({
+          agent_id: a.id,
+          agent_name: DISPLAY_NAMES[a.id] || a.name || 'Unknown',
+          status: a.status,
+          current_task: a.lastTask || '',
+          lastActiveMs: a.lastActiveMs || 0,
+          model: a.model || '',
+          totalTokens: a.totalTokens || 0,
+          contextTokens: a.contextTokens || 0,
+        })));
       }
-      if (tRes.ok) setTasks(await tRes.json());
+      if (aRes.ok) setApprovals(await aRes.json());
+      if (liveRes.ok) {
+        setLiveSessions(await liveRes.json());
+      }
+      if (tRes.ok) {
+          const todosData = await tRes.json();
+          setAgentTodos(todosData?.agents ?? []);
+        }
       if (gwRes && gwRes.ok) setGateway(await gwRes.json());
       if (costRes && costRes.ok) {
         try {
@@ -172,16 +180,8 @@ export default function CommandCenterPage() {
     return () => clearInterval(id);
   }, [fetchAll]);
 
-  const workingAgents = stations.filter(s => resolveStatus(s.status, s.updated_at) === 'working');
-  const taskCounts = {
-    todo: tasks.filter(t => t.status === 'backlog').length,
-    inProgress: tasks.filter(t => t.status === 'in-progress').length,
-    done: tasks.filter(t => t.status === 'done').length,
-  };
-  const totalTasks = tasks.length;
-  const donePercent = totalTasks > 0 ? Math.round((taskCounts.done / totalTasks) * 100) : 0;
-  const todayPst = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date()); // "YYYY-MM-DD" in PST
-  const doneToday = tasks.filter(t => t.status === 'done' && t.updated_at && new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(parseUtc(t.updated_at)) === todayPst).length;
+  const workingAgents = stations.filter(s => s.status === 'working');
+  const totalTodos = agentTodos.reduce((sum, a) => sum + a.todos.length, 0);
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -226,42 +226,59 @@ export default function CommandCenterPage() {
         </div>
       )}
 
-      {/* Active Agents — prominent at top */}
+      {/* Live Sessions — from gateway, accurate to the second */}
       <section className="mb-6">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-neutral-300 flex items-center gap-2">
-            <Users size={14} className="text-green-400" />
-            Active Agents
-            {workingAgents.length > 0 && (
+            <Zap size={14} className="text-green-400" />
+            Live Sessions
+            {liveSessions.length > 0 && (
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/25">
-                {workingAgents.length} working
+                {liveSessions.length} active
               </span>
             )}
           </h2>
           <Link href="/team" className="text-[11px] text-neutral-500 hover:text-indigo-400 transition-colors">View Team →</Link>
         </div>
 
-        {workingAgents.length === 0 ? (
+        {liveSessions.length === 0 ? (
           <div className="py-6 px-4 text-center border border-dashed border-white/[0.05] rounded-xl">
-            <p className="text-xs text-neutral-600">No agents currently working</p>
-            <p className="text-[10px] text-neutral-700 mt-0.5">Agents will appear here when they pick up tasks</p>
+            <p className="text-xs text-neutral-600">No active sessions</p>
+            <p className="text-[10px] text-neutral-700 mt-0.5">Sessions appear here when agents are running — data from gateway</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {workingAgents.map(agent => (
-              <div key={agent.agent_id} className="card p-4 border-green-500/20 shimmer-hover relative overflow-hidden">
+            {liveSessions.map(sess => (
+              <div key={sess.id} className="card p-4 border-green-500/20 shimmer-hover relative overflow-hidden">
                 <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-green-500/0 via-green-500/60 to-green-500/0" />
                 <div className="flex items-start gap-3">
                   <div className="relative shrink-0">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white font-bold text-sm">
-                      {agent.agent_name.split(/\s+/).map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)}
+                      {sess.agent_name.split(/\s+/).map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)}
                     </div>
                     <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#0a0a0f] bg-green-400 pulse-dot" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-white">{agent.agent_name}</p>
-                    <p className="text-[11px] text-neutral-500 truncate mt-0.5">{agent.current_task || 'Working...'}</p>
-                    <p className="text-[10px] text-neutral-700 mt-1">Updated {relativeTime(agent.updated_at)}</p>
+                    <p className="text-sm font-semibold text-white">{sess.agent_name}</p>
+                    <p className="text-[10px] text-neutral-500 font-mono mt-0.5">{shortModel(sess.model || '')}</p>
+                    {/* Context fill bar */}
+                    {sess.contextPct !== null && (
+                      <div className="mt-1.5">
+                        <div className="flex items-center justify-between mb-0.5">
+                          <span className="text-[9px] text-neutral-600">Context</span>
+                          <span className="text-[9px] text-neutral-400 font-mono">{sess.contextPct}%</span>
+                        </div>
+                        <div className="h-1 bg-white/[0.08] rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              sess.contextPct > 80 ? 'bg-red-500' : sess.contextPct > 50 ? 'bg-yellow-500' : 'bg-green-500'
+                            }`}
+                            style={{ width: `${Math.min(sess.contextPct, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    <p className="text-[10px] text-neutral-700 mt-1">{timeAgoMs(sess.ageMs)}</p>
                   </div>
                 </div>
               </div>
@@ -293,7 +310,7 @@ export default function CommandCenterPage() {
       </section>
 
       {/* Middle row: Approvals + Activity + Events */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         {/* Pending Approvals */}
         <div className="card p-5 shimmer-hover relative overflow-hidden">
           <div className="flex items-center justify-between mb-3">
@@ -332,39 +349,6 @@ export default function CommandCenterPage() {
           )}
         </div>
 
-        {/* Recent Activity */}
-        <div className="card p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-              <Activity size={14} className="text-indigo-400" />
-              Recent Activity
-            </h3>
-            <Link href="/activity" className="text-[11px] text-neutral-500 hover:text-indigo-400 transition-colors">View All →</Link>
-          </div>
-          {activity.length === 0 ? (
-            <div className="py-6 text-center border border-dashed border-white/[0.06] rounded-lg">
-              <p className="text-xs text-neutral-600">No activity yet</p>
-              <p className="text-[10px] text-neutral-700 mt-0.5">Events will appear here as agents report them</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {activity.map(e => (
-                <div key={e.id} className="flex items-start gap-2">
-                  <span className="text-sm mt-0.5">{getAgentEmoji(e.agent_id)}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${EVENT_COLORS[e.event_type] || 'text-neutral-400 bg-neutral-500/10'}`}>
-                        {e.event_type.replace('_', ' ').toUpperCase()}
-                      </span>
-                      <span className="text-[10px] text-neutral-600 font-mono">{relativeTime(e.created_at)}</span>
-                    </div>
-                    <p className="text-[11px] text-neutral-300 truncate mt-0.5">{e.title}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
 
         {/* Upcoming Events or Pipeline */}
         {hasEvents ? (
@@ -389,45 +373,29 @@ export default function CommandCenterPage() {
           <div className="card p-5">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                <Clock size={14} className="text-purple-400" />
-                Pipeline Health
+                <ListTodo size={14} className="text-purple-400" />
+                Agent To-Dos
               </h3>
-              <Link href="/tasks" className="text-[11px] text-neutral-500 hover:text-purple-400 transition-colors">View Tasks →</Link>
+              <Link href="/todos" className="text-[11px] text-neutral-500 hover:text-purple-400 transition-colors">View All →</Link>
             </div>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-neutral-500" />
-                  <span className="text-xs text-neutral-400">Backlog</span>
-                </div>
-                <span className="text-sm font-bold text-white">{taskCounts.todo}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-yellow-400" />
-                  <span className="text-xs text-neutral-400">In Progress</span>
-                </div>
-                <span className="text-sm font-bold text-white">{taskCounts.inProgress}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-green-400" />
-                  <span className="text-xs text-neutral-400">Done</span>
-                </div>
-                <span className="text-sm font-bold text-white">{taskCounts.done}</span>
-              </div>
-              <div className="pt-2 border-t border-white/[0.06]">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[10px] text-neutral-500 font-medium">COMPLETION</span>
-                  <span className="text-[11px] text-white font-bold">{donePercent}%</span>
-                </div>
-                <div className="h-1.5 bg-white/[0.1] rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500"
-                    style={{ width: `${Math.max(donePercent, donePercent > 0 ? 4 : 0)}%` }}
-                  />
-                </div>
-              </div>
+            <div className="space-y-2">
+              {agentTodos.length === 0 ? (
+                <p className="text-xs text-neutral-600 py-2">No todos found in agent workspaces.</p>
+              ) : (
+                agentTodos.flatMap(a => a.todos.slice(0, 2).map((todo, i) => (
+                  <div key={`${a.agentId}-${i}`} className="flex items-start gap-2 py-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-400/60 mt-1.5 flex-shrink-0" />
+                    <div className="min-w-0">
+                      <span className="text-[10px] font-bold text-indigo-400 mr-1">[{a.agentId}]</span>
+                      <span className="text-xs text-neutral-300">{todo.action}</span>
+                      {todo.problem && <span className="text-[10px] text-neutral-500"> — {todo.problem}</span>}
+                    </div>
+                  </div>
+                ))).slice(0, 5)
+              )}
+              {totalTodos > 5 && (
+                <p className="text-[10px] text-neutral-600 pt-1">+{totalTodos - 5} more</p>
+              )}
             </div>
           </div>
         )}
@@ -457,26 +425,26 @@ export default function CommandCenterPage() {
           <p className="text-[10px] text-neutral-600 mt-0.5">pending review</p>
         </div>
 
-        <div className="card p-4 shimmer-hover relative overflow-hidden">
+        <Link href="/todos" className="card p-4 shimmer-hover block relative overflow-hidden">
           <div className="flex items-center gap-2 mb-2.5">
             <div className="w-8 h-8 rounded-lg bg-purple-500/15 flex items-center justify-center shrink-0">
-              <CheckSquare size={15} className="text-purple-400" />
+              <ListTodo size={15} className="text-purple-400" />
             </div>
-            <span className="text-[11px] text-neutral-500 font-semibold tracking-wide">Tasks</span>
+            <span className="text-[11px] text-neutral-500 font-semibold tracking-wide">Todos</span>
           </div>
-          <p className={`text-2xl font-extrabold ${taskCounts.inProgress === 0 ? 'text-neutral-600' : 'text-yellow-400'}`}>{taskCounts.inProgress}</p>
-          <p className="text-[10px] text-neutral-600 mt-0.5">in progress</p>
-        </div>
+          <p className={`text-2xl font-extrabold ${totalTodos === 0 ? 'text-neutral-600' : 'text-purple-400'}`}>{totalTodos}</p>
+          <p className="text-[10px] text-neutral-600 mt-0.5">across all agents</p>
+        </Link>
 
         <div className="card p-4 shimmer-hover relative overflow-hidden">
           <div className="flex items-center gap-2 mb-2.5">
             <div className="w-8 h-8 rounded-lg bg-green-500/15 flex items-center justify-center shrink-0">
-              <CheckSquare size={15} className="text-green-400" />
+              <Activity size={15} className="text-green-400" />
             </div>
-            <span className="text-[11px] text-neutral-500 font-semibold tracking-wide">Done Today</span>
+            <span className="text-[11px] text-neutral-500 font-semibold tracking-wide">Active</span>
           </div>
-          <p className={`text-2xl font-extrabold ${doneToday === 0 ? 'text-neutral-600' : 'text-green-400'}`}>{doneToday}</p>
-          <p className="text-[10px] text-neutral-600 mt-0.5">completed today</p>
+          <p className={`text-2xl font-extrabold ${workingAgents.length === 0 ? 'text-neutral-600' : 'text-green-400'}`}>{workingAgents.length}</p>
+          <p className="text-[10px] text-neutral-600 mt-0.5">agents working</p>
         </div>
 
         <div className="card p-4 shimmer-hover relative overflow-hidden">
@@ -484,16 +452,10 @@ export default function CommandCenterPage() {
             <div className="w-8 h-8 rounded-lg bg-indigo-500/15 flex items-center justify-center shrink-0">
               <TrendingUp size={15} className="text-indigo-400" />
             </div>
-            <span className="text-[11px] text-neutral-500 font-semibold tracking-wide">Completion</span>
+            <span className="text-[11px] text-neutral-500 font-semibold tracking-wide">Todo Agents</span>
           </div>
-          <p className={`text-2xl font-extrabold ${donePercent === 0 ? 'text-neutral-600' : 'text-white'}`}>{donePercent}%</p>
-          <div className="mt-1.5 h-1.5 bg-white/[0.1] rounded-full overflow-hidden">
-            {donePercent > 0 ? (
-              <div className="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full transition-all duration-500" style={{ width: `${donePercent}%` }} />
-            ) : (
-              <div className="h-full w-full rounded-full bg-white/[0.04]" />
-            )}
-          </div>
+          <p className={`text-2xl font-extrabold ${agentTodos.length === 0 ? 'text-neutral-600' : 'text-white'}`}>{agentTodos.length}</p>
+          <p className="text-[10px] text-neutral-600 mt-0.5">with active todos</p>
         </div>
 
         <Link href="/costs" className="card p-4 shimmer-hover block relative overflow-hidden">

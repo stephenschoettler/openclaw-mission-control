@@ -5,9 +5,9 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const agentId = searchParams.get('agent_id');
 
-  const rows = agentId
-    ? db.prepare('SELECT * FROM activity_feed WHERE agent_id = ? ORDER BY id DESC LIMIT 50').all(agentId)
-    : db.prepare('SELECT * FROM activity_feed ORDER BY id DESC LIMIT 50').all();
+  const rows = (agentId
+    ? db.prepare("SELECT * FROM activity_feed WHERE agent_id = ? AND created_at >= datetime('now', '-24 hours') ORDER BY id DESC LIMIT 50").all(agentId)
+    : db.prepare("SELECT * FROM activity_feed WHERE created_at >= datetime('now', '-24 hours') ORDER BY id DESC LIMIT 50").all()) as Record<string, unknown>[];
 
   return NextResponse.json(rows);
 }

@@ -187,7 +187,7 @@ export default function SystemPage() {
           className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[#252528] border border-white/[0.08] text-sm font-medium text-neutral-200 hover:bg-white/[0.08] hover:border-indigo-500/30 transition-all disabled:opacity-50"
         >
           <RotateCcw size={14} className={restarting === 'mission-control' ? 'animate-spin' : ''} />
-          Restart MC
+          Restart Overwatch
         </button>
         <button
           onClick={runDoctor}
@@ -222,7 +222,7 @@ export default function SystemPage() {
               <div key={svc.name} className="flex items-center gap-4 px-5 py-3">
                 <StatusDot status={svc.status} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-neutral-100">{svc.name}</p>
+                  <p className="text-sm font-medium text-neutral-100">{svc.name === 'mission-control' ? 'overwatch' : svc.name}</p>
                   <p className="text-[11px] text-neutral-600">systemd · {svc.uptime ? `up ${svc.uptime}` : 'no uptime data'}</p>
                 </div>
                 <StatusBadge status={svc.status} />
@@ -242,7 +242,7 @@ export default function SystemPage() {
               <div key={svc.name} className="flex items-center gap-4 px-5 py-3">
                 <StatusDot status={svc.status} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-neutral-100">{svc.name}</p>
+                  <p className="text-sm font-medium text-neutral-100">{svc.name === 'mission-control' ? 'overwatch' : svc.name}</p>
                   <p className="text-[11px] text-neutral-600">docker · {svc.uptime || 'no uptime data'}</p>
                 </div>
                 <StatusBadge status={svc.status} />

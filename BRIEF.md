@@ -1,160 +1,73 @@
-# Mission Control — Build Brief
+# BRIEF: Fix Active Agent Sync + Display Issues
 
-## Overview
-Build a NextJS 14 (App Router) "Mission Control" dashboard for an OpenClaw AI agent fleet.
-This is a personal ops dashboard running locally on port 3001.
+## Context
+Mission Control at `/home/w0lf/mission-control` is a Next.js app.
 
-## Tech Stack
-- **NextJS 14** with App Router (`npx create-next-app@14 . --typescript --tailwind --app --src-dir --no-eslint --import-alias "@/*"`)
-- **better-sqlite3** for persisting tasks and content pipeline items
-- **Tailwind CSS** (dark theme, already included)
-- **Lucide React** for icons
-- **No auth required** (local/Tailscale only)
+## Bug 1: Home page and /team show DIFFERENT active agents
 
-## Design System — Dark Theme
-Match this CSS variable palette exactly:
-```
---bg: #0a0a0f
---surface: rgba(255,255,255,0.03)
---border: rgba(255,255,255,0.06)
---accent: #6366f1 (indigo)
---accent2: #9333ea (purple)
---green: #4ade80
---yellow: #facc15
---red: #f87171
---orange: #fb923c
---text: #e5e5e5
---textStrong: #ffffff
---muted: #737373
-```
-Font: `-apple-system, BlinkMacSystemFont, 'SF Pro', 'Helvetica Neue', sans-serif`
-Use glassmorphism cards: `bg-white/[0.03] border border-white/[0.06] rounded-xl`
+### Root Cause
+- `/team` page → calls `/api/agent-status` → reads `sessions.json` content, checks individual session `updatedAt` timestamps → accurate
+- Home page (page.tsx) → calls `/api/office` → uses `sessions.json` mtime → inaccurate/different
 
-## Panels to Build (sidebar nav tabs)
+### Fix
+Change the home page to call `/api/agent-status` instead of `/api/office` for agent status.
 
-### 1. Tasks Board (`/tasks`)
-- Kanban columns: Backlog | In Progress | Done
-- Task fields: title, description, assignee (me | Babbage | Hustle | Code Monkey | Roadie | TLDR | Answring Ops), priority (low|medium|high|urgent), status
-- CRUD: add, edit, drag between columns (use @hello-pangea/dnd or simple click-to-move buttons), delete
-- Persist in SQLite (`~/.mission-control/db.sqlite`)
-- Empty state: helpful placeholder text
+In `src/app/page.tsx`:
+1. Change the fetch from `/api/office` to `/api/agent-status`
+2. The `/api/agent-status` response is `AgentStatus[]` with fields: `{ id, name, role, status, lastActiveMs, lastTask, workspace, model, sessionId }`
+3. Map this to work with the existing stations state:
+   - agent_id → id
+   - agent_name → use the DISPLAY NAME from the map below (not a.name from config)
+   - status → status ('working' or 'idle')
+   - current_task → lastTask
+   - updated_at → DON'T use this; instead use lastActiveMs for time display
 
-### 2. Calendar (`/calendar`)
-- Monthly calendar grid (current month, prev/next nav)
-- Read OpenClaw cron jobs from `/home/w0lf/.openclaw/openclaw.json` (path: `crons` array, each has `id`, `schedule` (cron expr), `name`/`label`, `agent`, `enabled`)
-- Display cron events on their next scheduled occurrence date
-- Also show manual events (add via form: title, date, time, notes) — persist in SQLite
-- Color-code: crons in indigo, manual events in green
+### Display Name Map (use these)
+main → Babbage
+answring → Maya
+answring-sales → Sal
+answring-qa → Quinn
+answring-strategist → Stella
+answring-ops → Opie
+answring-dev → Devin
+answring-marketing → Marcus
+answring-security → Cera
+code-monkey → Code Monkey
+code-frontend → Frontend
+code-backend → Backend
+code-devops → DevOps
+code-webdev → WebDev
+ralph → Ralph
+tldr → Cliff
+browser → Crawler
+forge → Forge
+hustle → Hustle
+roadie → Roadie
+docs → The Professor
 
-### 3. Memory (`/memory`)
-- List all markdown files from `/home/w0lf/.openclaw/workspace/memory/` sorted newest-first
-- Show filename, first 3 lines as preview, file size
-- Click to open — render full markdown in a side panel (use `react-markdown`)
-- Search bar: client-side filter on filename + content preview
-- Also include files from `/home/w0lf/.openclaw/workspace/MEMORY.md` (pinned at top)
+## Bug 2: "Updated 100536 ms" — not human readable
 
-### 4. Team (`/team`)
-- Read agents from `/home/w0lf/.openclaw/openclaw.json` (path: `agents.list[]`)
-- Show each agent as a card: name, model, workspace path, id
-- Agent avatars: colored initials circle (indigo gradient)
-- Status badge: show "Active" (green) for all (can't know real-time status)
-- Include a "Fleet Stats" header: total agents, models breakdown
+In `src/app/page.tsx` line 266:
+  <p>Updated {relativeTime(agent.updated_at)}</p>
 
-### 5. Content Pipeline (`/content`)
-- Kanban: Idea | Scripted | Thumbnail | Filming | Published
-- Item fields: title, notes, script (textarea), thumbnail URL
-- CRUD + drag between stages (or click buttons)
-- Persist in SQLite
+After the fix, agent.updated_at won't exist. Use lastActiveMs (a number in ms).
+Add a timeAgoMs(ms: number) helper:
+  if (!ms) return 'Never';
+  const diff = Date.now() - ms;
+  if (diff < 60000) return 'just now';
+  if (diff < 3600000) return `${Math.floor(diff/60000)}m ago`;
+  if (diff < 86400000) return `${Math.floor(diff/3600000)}h ago`;
+  return `${Math.floor(diff/86400000)}d ago`;
 
-### 6. Office (`/office`)
-- Grid of agent "workstations" — each agent gets a card with:
-  - Avatar (colored initials, animated pulse if "active")
-  - Name + role
-  - Current task (manual text field, editable inline)
-  - Status: Working | Idle | Offline (click to cycle)
-- Fun retro-office aesthetic: desk emoji 🖥️, subtle grid background
-- Persist status + current task in SQLite
+Then use: Updated {timeAgoMs(agent.lastActiveMs)}
 
-## File Structure
-```
-~/mission-control/
-  src/
-    app/
-      layout.tsx         -- root layout with sidebar nav
-      page.tsx           -- redirect to /tasks
-      tasks/page.tsx
-      calendar/page.tsx
-      memory/page.tsx
-      team/page.tsx
-      content/page.tsx
-      office/page.tsx
-    api/
-      tasks/route.ts     -- GET/POST/PATCH/DELETE
-      events/route.ts    -- calendar events
-      content/route.ts
-      office/route.ts
-      crons/route.ts     -- reads openclaw.json
-      agents/route.ts    -- reads openclaw.json
-      memory/route.ts    -- lists/reads memory files
-    lib/
-      db.ts              -- SQLite setup (better-sqlite3)
-  next.config.js         -- port 3001 in package.json scripts
-  package.json
-```
+## Bug 3: Agent names show wrong names (e.g. "Answring Manager" instead of "Maya")
+Use the display name map above everywhere agent names are shown on the home page.
 
-## SQLite DB Location
-Store at `/home/w0lf/.mission-control/db.sqlite` (create dir if needed).
-Initialize tables on first run in `lib/db.ts`.
+## After fixing
+1. Build: cd /home/w0lf/mission-control && npm run build
+2. Check pm2: pm2 list, then pm2 restart mission-control (or whatever the process name is)
+3. The result: BOTH pages must show identical active/idle agents
 
-## Port
-Run on port 3001. Set in `package.json`:
-```json
-"dev": "next dev -p 3001",
-"start": "next start -p 3001"
-```
-
-## Systemd User Service
-Create `/home/w0lf/.config/systemd/user/mission-control.service`:
-```ini
-[Unit]
-Description=Mission Control Dashboard
-After=network.target
-
-[Service]
-Type=simple
-WorkingDirectory=/home/w0lf/mission-control
-ExecStart=/usr/bin/node_modules/.bin/next start -p 3001
-Restart=on-failure
-RestartSec=5
-Environment=NODE_ENV=production
-Environment=PATH=/home/w0lf/.npm-packages/bin:/usr/local/bin:/usr/bin:/bin
-
-[Install]
-WantedBy=default.target
-```
-Also create a build script at `~/mission-control/build-and-start.sh` with `npm run build && npm start`.
-
-## Sidebar Navigation
-Left sidebar (fixed, 220px wide):
-- Logo: "⚡ Mission Control" in gradient text
-- Nav items with icons (lucide): Tasks (CheckSquare), Calendar (CalendarDays), Memory (Brain), Team (Users), Content (Film), Office (Building2)
-- Active state: indigo left border + slight background
-- Bottom: hostname + "Babbage Fleet" label
-
-## Notes
-- No external API calls — all data is local files or SQLite
-- All API routes read files server-side (not client-side fetch of local paths)
-- The openclaw.json path is `/home/w0lf/.openclaw/openclaw.json`
-- Memory files path: `/home/w0lf/.openclaw/workspace/memory/`
-- Use `fs` module in API routes to read local files
-- Handle missing files gracefully (return empty arrays)
-
-## When Done
-After building, run:
-```bash
-cd ~/mission-control && npm install && npm run build
-```
-Then notify:
-```bash
-~/.npm-packages/bin/openclaw system event --text "Done: Mission Control built at ~/mission-control — port 3001. Run: npm start" --mode now
-```
+When completely finished run:
+openclaw system event --text "Done: Fixed active agent sync between home and /team pages" --mode now

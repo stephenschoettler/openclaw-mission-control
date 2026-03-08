@@ -25,6 +25,10 @@ interface TodoItem {
   problem: string;
   files: string;
   solution: string;
+  priority: 1 | 2 | 3;
+  assignee?: string;
+  prLink?: string;
+  snoozeUntil?: string;
 }
 
 interface CompletedItem {
@@ -35,6 +39,28 @@ interface CompletedItem {
 interface ParseResult {
   todos: TodoItem[];
   completed: CompletedItem[];
+}
+
+function parseAssignee(line: string): string | undefined {
+  const m = line.match(/\*\*Assignee:\*\*\s*([^\s*][^*]*?)(?=\s*\*\*|$)/i);
+  return m ? m[1].trim() : undefined;
+}
+
+function parsePrLink(line: string): string | undefined {
+  const m = line.match(/\*\*PR:\*\*\s*(#\d+)/i);
+  return m ? m[1].trim() : undefined;
+}
+
+function parseSnoozeUntil(line: string): string | undefined {
+  const m = line.match(/\*\*Snooze:\*\*\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/i);
+  if (!m) return undefined;
+  return new Date(m[1]).toISOString();
+}
+
+function parsePriority(line: string): 1 | 2 | 3 {
+  if (/\*\*P1\*\*/.test(line)) return 1;
+  if (/\*\*P2\*\*/.test(line)) return 2;
+  return 3;
 }
 
 function parseTodosFile(content: string): ParseResult {
@@ -48,24 +74,37 @@ function parseTodosFile(content: string): ParseResult {
   let currentProblem = '';
   let currentFiles = '';
   let currentSolution = '';
+  let currentPriority: 1 | 2 | 3 = 3;
+  let currentAssignee: string | undefined;
+  let currentPrLink: string | undefined;
+  let currentSnoozeUntil: string | undefined;
   let inSection = false;
   let inCompleted = false;
 
   const flushTodo = () => {
     if (inSection && currentAction) {
-      todos.push({
+      const item: TodoItem = {
         title: currentTitle,
         date: currentDate,
         action: currentAction,
         problem: currentProblem,
         files: currentFiles,
         solution: currentSolution,
-      });
+        priority: currentPriority,
+      };
+      if (currentAssignee) item.assignee = currentAssignee;
+      if (currentPrLink) item.prLink = currentPrLink;
+      if (currentSnoozeUntil) item.snoozeUntil = currentSnoozeUntil;
+      todos.push(item);
     }
   };
 
+  const resetCurrent = () => {
+    currentAction = ''; currentProblem = ''; currentFiles = ''; currentSolution = '';
+    currentPriority = 3; currentAssignee = undefined; currentPrLink = undefined; currentSnoozeUntil = undefined;
+  };
+
   for (const line of lines) {
-    // Completed section
     if (line.match(/^##\s+Completed/i)) {
       flushTodo();
       inSection = false;
@@ -73,7 +112,6 @@ function parseTodosFile(content: string): ParseResult {
       continue;
     }
 
-    // Parse completed items: - **action** ✓ completed: YYYY-MM-DD HH:MM
     if (inCompleted) {
       const completedMatch = line.match(/^-\s+\*\*(.+?)\*\*.*✓\s*completed:\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/);
       if (completedMatch) {
@@ -82,42 +120,34 @@ function parseTodosFile(content: string): ParseResult {
       continue;
     }
 
-    // Match ## Title - Date headings
     const headingMatch = line.match(/^##\s+(.+?)\s*-\s*(.+)$/);
     if (headingMatch) {
       flushTodo();
       currentTitle = headingMatch[1].trim();
       currentDate = headingMatch[2].trim();
-      currentAction = '';
-      currentProblem = '';
-      currentFiles = '';
-      currentSolution = '';
+      resetCurrent();
       inSection = true;
       continue;
     }
 
     if (!inSection) continue;
 
-    // If this heading is 'Completed', mark and skip items
     if (currentTitle.toLowerCase() === 'completed') { inCompleted = true; continue; }
 
-    // Match - **action** list items
     const actionMatch = line.match(/^-\s+\*\*(.+?)\*\*/);
     if (actionMatch) {
-      if (currentAction) {
-        flushTodo();
-        currentAction = '';
-        currentProblem = '';
-        currentFiles = '';
-        currentSolution = '';
-      }
+      if (currentAction) { flushTodo(); resetCurrent(); }
       currentAction = actionMatch[1].trim();
+      currentPriority = parsePriority(line);
+      currentAssignee = parseAssignee(line);
+      currentPrLink = parsePrLink(line);
+      currentSnoozeUntil = parseSnoozeUntil(line);
 
       const rest = line.replace(/^-\s+\*\*.+?\*\*/, '').replace(/^[\s:—–-]+/, '').trim();
       if (rest) {
-        const probMatch = rest.match(/\*\*Problem:\*\*\s*([^*]+?)(?=\s*\*\*(?:Files?|Solution):|$)/i);
-        const filesMatch = rest.match(/\*\*Files?:\*\*\s*([^*]+?)(?=\s*\*\*(?:Problem|Solution):|$)/i);
-        const solMatch = rest.match(/\*\*Solution:\*\*\s*([^*]+?)(?=\s*\*\*(?:Problem|Files?):|$)/i);
+        const probMatch = rest.match(/\*\*Problem:\*\*\s*([^*]+?)(?=\s*\*\*(?:Files?|Solution|Assignee|PR|Snooze):|$)/i);
+        const filesMatch = rest.match(/\*\*Files?:\*\*\s*([^*]+?)(?=\s*\*\*(?:Problem|Solution|Assignee|PR|Snooze):|$)/i);
+        const solMatch = rest.match(/\*\*Solution:\*\*\s*([^*]+?)(?=\s*\*\*(?:Problem|Files?|Assignee|PR|Snooze):|$)/i);
         if (probMatch) currentProblem = probMatch[1].trim();
         else currentProblem = rest;
         if (filesMatch) currentFiles = filesMatch[1].trim();
@@ -126,7 +156,7 @@ function parseTodosFile(content: string): ParseResult {
       continue;
     }
 
-    const subMatch = line.match(/^\s+-\s+\*\*(Problem|Files?|Solution|Issue|Task|Note)\*\*[:\s]+(.+)$/i);
+    const subMatch = line.match(/^\s+-\s+\*\*(Problem|Files?|Solution|Issue|Task|Note|Assignee|PR|Snooze)\*\*[:\s]+(.+)$/i);
     if (subMatch) {
       const key = subMatch[1].toLowerCase();
       const val = subMatch[2].trim();
@@ -134,10 +164,22 @@ function parseTodosFile(content: string): ParseResult {
       else if (key.startsWith('file')) currentFiles = val;
       else if (key === 'solution') currentSolution = val;
       else if (key === 'task' || key === 'note') currentProblem = val;
+      else if (key === 'assignee') currentAssignee = val;
+      else if (key === 'pr') currentPrLink = val.startsWith('#') ? val : `#${val}`;
+      else if (key === 'snooze') {
+        const sm = val.match(/(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/);
+        if (sm) currentSnoozeUntil = new Date(sm[1]).toISOString();
+      }
     }
   }
 
   flushTodo();
+
+  todos.sort((a, b) => {
+    if (a.priority !== b.priority) return a.priority - b.priority;
+    return a.date.localeCompare(b.date);
+  });
+
   return { todos, completed };
 }
 

@@ -154,49 +154,12 @@ function LogoutButton() {
   );
 }
 
-interface TodoBadgeState {
-  count: number;
-  hasP1: boolean;
-  hasP2Only: boolean;
-}
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingApprovals, setPendingApprovals] = useState(0);
   const [latestActivityId, setLatestActivityId] = useState(0);
   const [seenActivityId, setSeenActivityId] = useState(0);
-  const [todoBadge, setTodoBadge] = useState<TodoBadgeState>({ count: 0, hasP1: false, hasP2Only: false });
-
-  useEffect(() => {
-    const fetchTodos = async () => {
-      try {
-        const res = await fetch('/api/todos');
-        if (!res.ok) return;
-        const data = await res.json();
-        const agents: { todos: { title: string }[] }[] = data?.agents ?? [];
-        let count = 0;
-        let hasP1 = false;
-        let hasP2 = false;
-        for (const agent of agents) {
-          for (const todo of agent.todos) {
-            count++;
-            const m = todo.title?.match(/\b(P[123])\b/i);
-            if (m) {
-              if (m[1].toUpperCase() === 'P1') hasP1 = true;
-              if (m[1].toUpperCase() === 'P2') hasP2 = true;
-            }
-          }
-        }
-        setTodoBadge({ count, hasP1, hasP2Only: !hasP1 && hasP2 });
-      } catch {
-        // silently fail
-      }
-    };
-    fetchTodos();
-    const id = setInterval(fetchTodos, 60000);
-    return () => clearInterval(id);
-  }, []);
 
   useEffect(() => {
     const fetchPending = async () => {
@@ -326,17 +289,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     {items.map(({ href, label, icon: Icon, exact }) => {
                       const active = exact ? pathname === href : pathname.startsWith(href);
                       const isApprovals = href === '/approvals';
-                      const isTodos = href === '/todos';
+                      const isActivity = href === '/todos';
                       const showApprovalsBadge = isApprovals && pendingApprovals > 0;
-                      const showTodosBadge = isTodos && todoBadge.count > 0;
-                      const showActivityDot = isTodos && hasNewActivity && !showTodosBadge;
-
-                      const todosBadgeClass = todoBadge.hasP1
-                        ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                        : todoBadge.hasP2Only
-                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                        : 'bg-neutral-500/20 text-neutral-400 border border-neutral-500/30';
-
+                      const showActivityDot = isActivity && hasNewActivity;
                       return (
                         <Link
                           key={href}
@@ -352,10 +307,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                           {showApprovalsBadge ? (
                             <span className="ml-auto text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full px-1.5 py-0.5 min-w-[18px] text-center leading-none">
                               {pendingApprovals > 99 ? '99+' : pendingApprovals}
-                            </span>
-                          ) : showTodosBadge ? (
-                            <span className={`ml-auto text-[10px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center leading-none ${todosBadgeClass}`}>
-                              {todoBadge.count > 99 ? '99+' : todoBadge.count}
                             </span>
                           ) : showActivityDot ? (
                             <span className="ml-auto w-2 h-2 rounded-full bg-indigo-400 pulse-dot" />
